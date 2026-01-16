@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Health Reminder</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">💪</span>
+                <h1>Work Health Reminder</h1>
+            </div>
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span class="status-text" id="statusText">Đang kiểm tra...</span>
+            </div>
+        </header>
+
+        <!-- Time Display -->
+        <section class="time-section">
+            <div class="current-time" id="currentTime">--:--:--</div>
+            <div class="current-date" id="currentDate">--</div>
+        </section>
+
+        <!-- Progress Bar -->
+        <section class="progress-section">
+            <div class="progress-header">
+                <span>Tiến độ ngày làm việc</span>
+                <span id="workPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </section>
+
+        <!-- Timer Cards -->
+        <section class="timers-section">
+            <div class="timer-card walk" data-type="walk">
+                <div class="timer-icon">🚶</div>
+                <div class="timer-info">
+                    <span class="timer-label">Đi bộ</span>
+                    <span class="timer-countdown" id="walkTimer">--:--</span>
+                </div>
+                <button class="reset-btn" data-timer="walk" title="Reset">↻</button>
+            </div>
+            
+            <div class="timer-card water" data-type="water">
+                <div class="timer-icon">💧</div>
+                <div class="timer-info">
+                    <span class="timer-label">Uống nước</span>
+                    <span class="timer-countdown" id="waterTimer">--:--</span>
+                </div>
+                <button class="reset-btn" data-timer="water" title="Reset">↻</button>
+            </div>
+            
+            <div class="timer-card toilet" data-type="toilet">
+                <div class="timer-icon">🚻</div>
+                <div class="timer-info">
+                    <span class="timer-label">Đi toilet</span>
+                    <span class="timer-countdown" id="toiletTimer">--:--</span>
+                </div>
+                <button class="reset-btn" data-timer="toilet" title="Reset">↻</button>
+            </div>
+            
+            <div class="timer-card eye" data-type="eye_20_20_20">
+                <div class="timer-icon">👁️</div>
+                <div class="timer-info">
+                    <span class="timer-label">20-20-20</span>
+                    <span class="timer-countdown" id="eyeTimer">--:--</span>
+                </div>
+                <button class="reset-btn" data-timer="eye_20_20_20" title="Reset">↻</button>
+            </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="actions-section">
+            <button class="action-btn pause" id="btnPause">
+                <span class="btn-icon" id="pauseIcon">⏸️</span>
+                <span id="pauseText">Tạm dừng</span>
+            </button>
+            <button class="action-btn reset" id="btnResetAll">
+                <span class="btn-icon">🔄</span>
+                <span>Reset tất cả</span>
+            </button>
+        </section>
+
+        <!-- Exercise Menu -->
+        <section class="exercise-section">
+            <h3 class="section-title">💪 Bài tập ngay</h3>
+            <div class="exercise-grid">
+                <button class="exercise-btn" data-exercise="neck">🧘 Giãn cổ</button>
+                <button class="exercise-btn" data-exercise="shoulder">💪 Giãn vai</button>
+                <button class="exercise-btn" data-exercise="eye">👁️ Mắt</button>
+                <button class="exercise-btn" data-exercise="breathing">🌬️ Hít thở</button>
+                <button class="exercise-btn" data-exercise="posture">🪑 Tư thế</button>
+                <button class="exercise-btn" data-exercise="rule_20_20_20">👀 20-20-20</button>
+            </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="settings-section">
+            <div class="setting-item">
+                <label>
+                    <input type="checkbox" id="notificationEnabled" checked>
+                    🔔 Bật thông báo
+                </label>
+            </div>
+            <button class="test-btn" id="btnTest">📢 Test thông báo</button>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>Work Health Reminder Pro v1.0</span>
+        </footer>
+    </div>
+
+    <!-- Exercise Modal -->
+    <div class="modal-overlay" id="exerciseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Bài tập</h2>
+                <button class="close-btn" id="btnCloseModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <pre id="modalContent"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="done-btn" id="btnDone">Đã làm ✓</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="exercises.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
