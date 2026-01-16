@@ -495,11 +495,25 @@ class WorkHealthReminderGUI:
         return lunch_start <= current < work_resume
     
     def send_notification(self, title: str, message: str):
-        """Gửi thông báo macOS"""
-        script = f'''
-        display notification "{message}" with title "{title}" sound name "Glass"
-        '''
-        subprocess.run(['osascript', '-e', script], capture_output=True)
+        """Gửi thông báo Windows/macOS"""
+        import platform
+        
+        if platform.system() == "Windows":
+            try:
+                # Thử dùng win10toast nếu có
+                from win10toast import ToastNotifier
+                toaster = ToastNotifier()
+                toaster.show_toast(title, message, duration=5, threaded=True)
+            except ImportError:
+                # Fallback: dùng tkinter notification
+                self.root.after(0, lambda: messagebox.showinfo(title, message))
+        else:
+            # macOS
+            script = f'''
+            display notification "{message}" with title "{title}" sound name "Glass"
+            '''
+            subprocess.run(['osascript', '-e', script], capture_output=True)
+        
         print(f"🔔 [{datetime.now().strftime('%H:%M:%S')}] {title}: {message}")
     
     def run(self):
