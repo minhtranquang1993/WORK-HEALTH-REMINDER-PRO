@@ -1,5 +1,6 @@
 // ========================================
-// Work Health Reminder - Exercise Data
+// Work Health Reminder PRO - Exercise Data
+// Version 3.0
 // ========================================
 
 const EXERCISES = {
@@ -23,7 +24,7 @@ const EXERCISES = {
    → 5 vòng theo chiều kim đồng hồ
    → 5 vòng ngược chiều`
     },
-    
+
     shoulder: {
         title: "💪 Bài tập giãn vai",
         duration: "2 phút",
@@ -44,7 +45,7 @@ const EXERCISES = {
    → Đan các ngón tay sau lưng
    → Ưỡn ngực, giữ 15 giây`
     },
-    
+
     eye: {
         title: "👁️ Bài tập mắt",
         duration: "2 phút",
@@ -68,7 +69,7 @@ const EXERCISES = {
    → Áp nhẹ lên mắt đang nhắm
    → Giữ 30 giây, thư giãn`
     },
-    
+
     breathing: {
         title: "🌬️ Bài tập hít thở",
         duration: "2 phút",
@@ -88,9 +89,9 @@ const EXERCISES = {
 💡 Tip: Tưởng tượng bạn đang ở nơi
    yên tĩnh, thư thái...`
     },
-    
+
     rule_20_20_20: {
-        title: "👁️ Quy tắc 20-20-20",
+        title: "👀 Quy tắc 20-20-20",
         duration: "20 giây",
         content: `
 Mỗi 20 phút làm việc máy tính:
@@ -105,7 +106,7 @@ Mỗi 20 phút làm việc máy tính:
 💡 Tip: Nhìn ra cửa sổ hoặc
    vật xa nhất trong phòng!`
     },
-    
+
     posture: {
         title: "🪑 Kiểm tra tư thế ngồi",
         duration: "30 giây",
@@ -123,7 +124,7 @@ Mỗi 20 phút làm việc máy tính:
 ✗ Gù lưng
 ✗ Vắt chân qua nhau lâu`
     },
-    
+
     blink: {
         title: "😊 Nhắc chớp mắt",
         duration: "30 giây",
@@ -137,9 +138,11 @@ chúng ta thường quên chớp mắt!
 💡 Điều này giúp:
 • Làm ẩm mắt
 • Giảm khô và mỏi mắt
-• Bảo vệ giác mạc`
+• Bảo vệ giác mạc
+
+🔄 Thực hiện mỗi 15 phút!`
     },
-    
+
     stand_up: {
         title: "🚶 Đứng dậy đi bộ",
         duration: "3 phút",
@@ -155,11 +158,57 @@ chúng ta thường quên chớp mắt!
 💡 Lợi ích:
 • Tăng lưu thông máu
 • Giảm đau lưng, mỏi chân
-• Tăng năng suất làm việc`
+• Tăng năng suất làm việc
+• Giảm nguy cơ bệnh tim mạch`
+    },
+
+    // Additional exercises
+    wrist: {
+        title: "🤚 Bài tập cổ tay",
+        duration: "1 phút",
+        content: `
+1️⃣ Xoay cổ tay
+   → 10 vòng theo chiều kim đồng hồ
+   → 10 vòng ngược chiều
+
+2️⃣ Gập duỗi cổ tay
+   → Duỗi tay ra trước
+   → Dùng tay kia kéo ngón về phía mình
+   → Giữ 10 giây, đổi bên
+
+3️⃣ Nắm mở bàn tay
+   → Nắm chặt 5 giây
+   → Mở xòe 5 giây
+   → Lặp 10 lần
+
+💡 Giúp phòng ngừa hội chứng ống cổ tay!`
+    },
+
+    back: {
+        title: "🔙 Bài tập lưng",
+        duration: "2 phút",
+        content: `
+1️⃣ Cat-Cow (Mèo-Bò)
+   → Cong lưng lên như mèo giận
+   → Giữ 5 giây
+   → Võng lưng xuống như bò
+   → Giữ 5 giây
+   → Lặp 5 lần
+
+2️⃣ Twist ngồi
+   → Ngồi thẳng, xoay người sang trái
+   → Giữ 15 giây
+   → Xoay sang phải
+   → Giữ 15 giây
+
+3️⃣ Kéo giãn lưng dưới
+   → Ngồi ghế, cúi người về trước
+   → Tay chạm đất nếu được
+   → Giữ 20 giây`
     }
 };
 
-// Reminder messages
+// Reminder messages (for notifications)
 const REMINDERS = {
     walk: {
         icon: "🚶",
@@ -181,6 +230,11 @@ const REMINDERS = {
         title: "20-20-20!",
         message: "Nhìn ra xa 6 mét trong 20 giây để bảo vệ mắt!"
     },
+    blink: {
+        icon: "😊",
+        title: "Chớp mắt!",
+        message: "Chớp mắt 15-20 lần để làm ẩm mắt!"
+    },
     posture: {
         icon: "🪑",
         title: "Kiểm tra tư thế!",
@@ -191,6 +245,16 @@ const REMINDERS = {
         title: "Giãn cổ vai!",
         message: "Dành 2 phút để giãn cơ cổ và vai nhé!"
     },
+    eye_exercise: {
+        icon: "👁️",
+        title: "Bài tập mắt!",
+        message: "Làm bài tập mắt để bảo vệ thị lực!"
+    },
+    breathing: {
+        icon: "🌬️",
+        title: "Hít thở sâu!",
+        message: "Dành 2 phút hít thở sâu để thư giãn!"
+    },
     lunch: {
         icon: "🍱",
         title: "Đến giờ lấy phiếu cơm!",
@@ -199,6 +263,21 @@ const REMINDERS = {
     end_work: {
         icon: "🏠",
         title: "Hết giờ làm việc!",
-        message: "Đã 17:30! Chuẩn bị về nhà hoặc đón người yêu thôi! 💕"
+        message: "Chuẩn bị về nhà hoặc đón người yêu thôi! 💕"
+    },
+    night_mode: {
+        icon: "🌙",
+        title: "Bật Night Mode!",
+        message: "Bật Night Shift/Dark Mode để bảo vệ mắt!"
+    },
+    sleep: {
+        icon: "😴",
+        title: "Đến giờ ngủ rồi!",
+        message: "Ngủ đủ giấc giúp tăng cường trí nhớ và sức khỏe!"
+    },
+    morning: {
+        icon: "🌅",
+        title: "Chuẩn bị làm việc!",
+        message: "Sắp đến giờ làm việc. Bạn đã sẵn sàng chưa?"
     }
 };

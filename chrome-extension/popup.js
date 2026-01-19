@@ -1,11 +1,13 @@
 // ========================================
-// Work Health Reminder - Popup Script
+// Work Health Reminder PRO - Popup Script
+// Version 3.0
 // ========================================
 
 class PopupController {
     constructor() {
         this.initElements();
         this.initEventListeners();
+        this.loadSettings();
         this.startUpdating();
     }
 
@@ -25,18 +27,52 @@ class PopupController {
         // Timers
         this.walkTimer = document.getElementById('walkTimer');
         this.waterTimer = document.getElementById('waterTimer');
-        this.toiletTimer = document.getElementById('toiletTimer');
         this.eyeTimer = document.getElementById('eyeTimer');
+        this.blinkTimer = document.getElementById('blinkTimer');
+        this.postureTimer = document.getElementById('postureTimer');
+        this.neckTimer = document.getElementById('neckTimer');
 
         // Buttons
         this.btnPause = document.getElementById('btnPause');
         this.pauseIcon = document.getElementById('pauseIcon');
         this.pauseText = document.getElementById('pauseText');
         this.btnResetAll = document.getElementById('btnResetAll');
-        this.btnTest = document.getElementById('btnTest');
 
-        // Settings
-        this.notificationEnabled = document.getElementById('notificationEnabled');
+        // Focus Mode
+        this.btnStopFocus = document.getElementById('btnStopFocus');
+        this.focusStatus = document.getElementById('focusStatus');
+        this.focusTimeLeft = document.getElementById('focusTimeLeft');
+
+        // Pomodoro
+        this.pomodoroDisplay = document.getElementById('pomodoroDisplay');
+        this.pomodoroTime = document.getElementById('pomodoroTime');
+        this.pomodoroState = document.getElementById('pomodoroState');
+        this.btnStartPomodoro = document.getElementById('btnStartPomodoro');
+        this.btnStopPomodoro = document.getElementById('btnStopPomodoro');
+        this.pomodoroCount = document.getElementById('pomodoroCount');
+
+        // Settings inputs
+        this.settingWorkStart = document.getElementById('settingWorkStart');
+        this.settingWorkEnd = document.getElementById('settingWorkEnd');
+        this.settingLunchStart = document.getElementById('settingLunchStart');
+        this.settingLunchEnd = document.getElementById('settingLunchEnd');
+        this.settingWeekendMode = document.getElementById('settingWeekendMode');
+        this.settingSaturdayEnd = document.getElementById('settingSaturdayEnd');
+        this.settingSundayEnd = document.getElementById('settingSundayEnd');
+        this.settingSleepTime = document.getElementById('settingSleepTime');
+        this.settingNightMode = document.getElementById('settingNightMode');
+        this.settingNotification = document.getElementById('settingNotification');
+
+        // Intervals
+        this.intervalWalk = document.getElementById('intervalWalk');
+        this.intervalWater = document.getElementById('intervalWater');
+        this.intervalEye = document.getElementById('intervalEye');
+        this.intervalPosture = document.getElementById('intervalPosture');
+
+        // Settings buttons
+        this.btnSaveSettings = document.getElementById('btnSaveSettings');
+        this.btnResetSettings = document.getElementById('btnResetSettings');
+        this.btnTestNotification = document.getElementById('btnTestNotification');
 
         // Modal
         this.exerciseModal = document.getElementById('exerciseModal');
@@ -44,10 +80,18 @@ class PopupController {
         this.modalContent = document.getElementById('modalContent');
         this.btnCloseModal = document.getElementById('btnCloseModal');
         this.btnDone = document.getElementById('btnDone');
+
+        // Toast
+        this.toast = document.getElementById('toast');
     }
 
     initEventListeners() {
-        // Reset buttons
+        // Tab navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+
+        // Reset timer buttons
         document.querySelectorAll('.reset-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -61,8 +105,15 @@ class PopupController {
         // Reset all button
         this.btnResetAll.addEventListener('click', () => this.resetAll());
 
-        // Test notification
-        this.btnTest.addEventListener('click', () => this.testNotification());
+        // Focus Mode buttons
+        document.querySelectorAll('.focus-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.startFocus(parseInt(btn.dataset.minutes)));
+        });
+        this.btnStopFocus.addEventListener('click', () => this.stopFocus());
+
+        // Pomodoro buttons
+        this.btnStartPomodoro.addEventListener('click', () => this.startPomodoro());
+        this.btnStopPomodoro.addEventListener('click', () => this.stopPomodoro());
 
         // Exercise buttons
         document.querySelectorAll('.exercise-btn').forEach(btn => {
@@ -76,11 +127,22 @@ class PopupController {
             if (e.target === this.exerciseModal) this.hideModal();
         });
 
-        // Notification toggle
-        this.notificationEnabled.addEventListener('change', async (e) => {
-            const { settings } = await chrome.storage.local.get('settings');
-            settings.notificationEnabled = e.target.checked;
-            await chrome.storage.local.set({ settings });
+        // Settings
+        this.settingWeekendMode.addEventListener('change', () => this.updateWeekendModeUI());
+        this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
+        this.btnResetSettings.addEventListener('click', () => this.resetSettings());
+        this.btnTestNotification.addEventListener('click', () => this.testNotification());
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === `tab-${tabName}`);
         });
     }
 
@@ -102,7 +164,8 @@ class PopupController {
                 this.updateTimers(response.timers);
                 this.updateProgress(response.settings);
                 this.updatePauseButton(response.settings.isPaused);
-                this.notificationEnabled.checked = response.settings.notificationEnabled;
+                this.updateFocusDisplay(response.state);
+                this.updatePomodoroDisplay(response.state, response.settings);
             }
         } catch (e) {
             console.log('Error getting status:', e);
@@ -130,10 +193,16 @@ class PopupController {
     updateStatus(workStatus) {
         this.statusBadge.className = 'status-badge';
 
-        if (workStatus.status === 'lunch') {
+        if (workStatus.status === 'paused') {
+            this.statusBadge.classList.add('paused');
+        } else if (workStatus.status === 'lunch') {
             this.statusBadge.classList.add('lunch');
-        } else if (workStatus.status === 'ended' || workStatus.status === 'before') {
+        } else if (workStatus.status === 'ended' || workStatus.status === 'before' || workStatus.status === 'weekend') {
             this.statusBadge.classList.add('ended');
+        } else if (workStatus.status === 'focus') {
+            this.statusBadge.classList.add('focus');
+        } else if (workStatus.status.startsWith('pomodoro')) {
+            this.statusBadge.classList.add('pomodoro');
         }
 
         this.statusText.textContent = workStatus.label;
@@ -144,8 +213,10 @@ class PopupController {
 
         this.walkTimer.textContent = this.formatTime(timers.walk);
         this.waterTimer.textContent = this.formatTime(timers.water);
-        this.toiletTimer.textContent = this.formatTime(timers.toilet);
         this.eyeTimer.textContent = this.formatTime(timers.eye_20_20_20);
+        this.blinkTimer.textContent = this.formatTime(timers.blink);
+        this.postureTimer.textContent = this.formatTime(timers.posture);
+        this.neckTimer.textContent = this.formatTime(timers.neck_stretch);
     }
 
     formatTime(seconds) {
@@ -192,13 +263,51 @@ class PopupController {
             this.btnPause.classList.add('active');
             this.pauseIcon.textContent = '▶️';
             this.pauseText.textContent = 'Tiếp tục';
-            this.statusBadge.classList.add('paused');
-            this.statusText.textContent = '⏸️ Đã tạm dừng';
         } else {
             this.btnPause.classList.remove('active');
             this.pauseIcon.textContent = '⏸️';
             this.pauseText.textContent = 'Tạm dừng';
-            this.statusBadge.classList.remove('paused');
+        }
+    }
+
+    updateFocusDisplay(state) {
+        if (state.focusEndTime && Date.now() < state.focusEndTime) {
+            const remaining = Math.max(0, Math.floor((state.focusEndTime - Date.now()) / 1000));
+            this.focusTimeLeft.textContent = this.formatTime(remaining);
+            this.focusStatus.classList.remove('hidden');
+            this.btnStopFocus.classList.remove('hidden');
+            document.querySelector('.focus-buttons').classList.add('hidden');
+        } else {
+            this.focusStatus.classList.add('hidden');
+            this.btnStopFocus.classList.add('hidden');
+            document.querySelector('.focus-buttons').classList.remove('hidden');
+        }
+    }
+
+    updatePomodoroDisplay(state, settings) {
+        this.pomodoroCount.textContent = state.pomodoroCount || 0;
+
+        if (state.pomodoroState && state.pomodoroEndTime) {
+            const remaining = Math.max(0, Math.floor((state.pomodoroEndTime - Date.now()) / 1000));
+            this.pomodoroTime.textContent = this.formatTime(remaining);
+
+            this.pomodoroDisplay.classList.remove('work', 'break');
+            if (state.pomodoroState === 'work') {
+                this.pomodoroDisplay.classList.add('work');
+                this.pomodoroState.textContent = '🍅 Đang làm việc';
+            } else {
+                this.pomodoroDisplay.classList.add('break');
+                this.pomodoroState.textContent = '☕ Đang nghỉ';
+            }
+
+            this.btnStartPomodoro.classList.add('hidden');
+            this.btnStopPomodoro.classList.remove('hidden');
+        } else {
+            this.pomodoroTime.textContent = `${settings.pomodoroWork || 25}:00`;
+            this.pomodoroState.textContent = 'Sẵn sàng';
+            this.pomodoroDisplay.classList.remove('work', 'break');
+            this.btnStartPomodoro.classList.remove('hidden');
+            this.btnStopPomodoro.classList.add('hidden');
         }
     }
 
@@ -208,7 +317,7 @@ class PopupController {
                 action: 'resetTimer',
                 timerType: timerType
             });
-            this.showToast(`Đã reset timer ${timerType}!`);
+            this.showToast(`Đã reset timer!`);
         } catch (e) {
             console.log('Error resetting timer:', e);
         }
@@ -236,6 +345,42 @@ class PopupController {
         }
     }
 
+    async startFocus(minutes) {
+        try {
+            await chrome.runtime.sendMessage({ action: 'startFocus', minutes });
+            this.showToast(`🎯 Focus Mode: ${minutes} phút`);
+        } catch (e) {
+            console.log('Error starting focus:', e);
+        }
+    }
+
+    async stopFocus() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'stopFocus' });
+            this.showToast('🎯 Đã dừng Focus Mode');
+        } catch (e) {
+            console.log('Error stopping focus:', e);
+        }
+    }
+
+    async startPomodoro() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'startPomodoro' });
+            this.showToast('🍅 Bắt đầu Pomodoro!');
+        } catch (e) {
+            console.log('Error starting pomodoro:', e);
+        }
+    }
+
+    async stopPomodoro() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'stopPomodoro' });
+            this.showToast('🍅 Đã dừng Pomodoro');
+        } catch (e) {
+            console.log('Error stopping pomodoro:', e);
+        }
+    }
+
     async testNotification() {
         try {
             await chrome.runtime.sendMessage({ action: 'testNotification' });
@@ -259,34 +404,118 @@ class PopupController {
     }
 
     showToast(message) {
-        // Create toast if not exists
-        let toast = document.querySelector('.toast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.8);
-                color: #fff;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-size: 13px;
-                z-index: 1000;
-                opacity: 0;
-                transition: opacity 0.3s;
-            `;
-            document.body.appendChild(toast);
-        }
-
-        toast.textContent = message;
-        toast.style.opacity = '1';
+        this.toast.textContent = message;
+        this.toast.classList.add('show');
 
         setTimeout(() => {
-            toast.style.opacity = '0';
+            this.toast.classList.remove('show');
         }, 2000);
+    }
+
+    // Settings
+    async loadSettings() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getSettings' });
+            if (response && response.settings) {
+                const s = response.settings;
+
+                // Work hours
+                this.settingWorkStart.value = this.formatTimeValue(s.workStart);
+                this.settingWorkEnd.value = this.formatTimeValue(s.workEnd);
+                this.settingLunchStart.value = this.formatTimeValue(s.lunchStart);
+                this.settingLunchEnd.value = this.formatTimeValue(s.lunchEnd);
+
+                // Weekend mode
+                this.settingWeekendMode.value = s.weekendMode || 'mon_fri';
+                this.settingSaturdayEnd.value = this.formatTimeValue(s.saturdayEnd);
+                this.settingSundayEnd.value = this.formatTimeValue(s.sundayEnd);
+
+                // Special reminders
+                this.settingSleepTime.value = this.formatTimeValue(s.sleepReminderTime);
+                this.settingNightMode.value = this.formatTimeValue(s.nightModeStart);
+
+                // Notification
+                this.settingNotification.checked = s.notificationEnabled !== false;
+
+                // Intervals
+                if (s.intervals) {
+                    this.intervalWalk.value = s.intervals.walk || 30;
+                    this.intervalWater.value = s.intervals.water || 45;
+                    this.intervalEye.value = s.intervals.eye_20_20_20 || 20;
+                    this.intervalPosture.value = s.intervals.posture || 45;
+                }
+
+                this.updateWeekendModeUI();
+            }
+        } catch (e) {
+            console.log('Error loading settings:', e);
+        }
+    }
+
+    formatTimeValue(timeObj) {
+        if (!timeObj) return '08:00';
+        const h = String(timeObj.hour || 0).padStart(2, '0');
+        const m = String(timeObj.minute || 0).padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    parseTimeValue(timeStr) {
+        const [hour, minute] = timeStr.split(':').map(Number);
+        return { hour: hour || 0, minute: minute || 0 };
+    }
+
+    updateWeekendModeUI() {
+        const mode = this.settingWeekendMode.value;
+        const satRow = document.getElementById('saturdayEndRow');
+        const sunRow = document.getElementById('sundayEndRow');
+
+        satRow.classList.toggle('hidden', mode !== 'mon_sat_half');
+        sunRow.classList.toggle('hidden', mode !== 'mon_sun_half');
+    }
+
+    async saveSettings() {
+        try {
+            const settings = {
+                workStart: this.parseTimeValue(this.settingWorkStart.value),
+                workEnd: this.parseTimeValue(this.settingWorkEnd.value),
+                lunchStart: this.parseTimeValue(this.settingLunchStart.value),
+                lunchEnd: this.parseTimeValue(this.settingLunchEnd.value),
+                weekendMode: this.settingWeekendMode.value,
+                saturdayEnd: this.parseTimeValue(this.settingSaturdayEnd.value),
+                sundayEnd: this.parseTimeValue(this.settingSundayEnd.value),
+                sleepReminderTime: this.parseTimeValue(this.settingSleepTime.value),
+                nightModeStart: this.parseTimeValue(this.settingNightMode.value),
+                notificationEnabled: this.settingNotification.checked,
+                intervals: {
+                    walk: parseInt(this.intervalWalk.value) || 30,
+                    water: parseInt(this.intervalWater.value) || 45,
+                    toilet: 60,
+                    eye_20_20_20: parseInt(this.intervalEye.value) || 20,
+                    blink: 15,
+                    posture: parseInt(this.intervalPosture.value) || 45,
+                    neck_stretch: 60,
+                    eye_exercise: 90,
+                    breathing: 120
+                },
+                isConfigured: true
+            };
+
+            await chrome.runtime.sendMessage({ action: 'updateSettings', settings });
+            this.showToast('💾 Đã lưu cài đặt!');
+        } catch (e) {
+            console.log('Error saving settings:', e);
+            this.showToast('❌ Lỗi khi lưu cài đặt');
+        }
+    }
+
+    async resetSettings() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'resetToDefaults' });
+            await this.loadSettings();
+            this.showToast('🔄 Đã đặt lại mặc định!');
+        } catch (e) {
+            console.log('Error resetting settings:', e);
+        }
     }
 }
 

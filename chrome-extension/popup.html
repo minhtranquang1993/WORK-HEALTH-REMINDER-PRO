@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Work Health Reminder</title>
+    <title>Work Health Reminder PRO</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
         <header class="header">
             <div class="logo">
                 <span class="logo-icon">💪</span>
-                <h1>Work Health Reminder</h1>
+                <h1>Health Reminder PRO</h1>
             </div>
             <div class="status-badge" id="statusBadge">
                 <span class="status-dot"></span>
@@ -37,84 +37,264 @@
             </div>
         </section>
 
-        <!-- Timer Cards -->
-        <section class="timers-section">
-            <div class="timer-card walk" data-type="walk">
-                <div class="timer-icon">🚶</div>
-                <div class="timer-info">
-                    <span class="timer-label">Đi bộ</span>
-                    <span class="timer-countdown" id="walkTimer">--:--</span>
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="timers">⏱️ Timer</button>
+            <button class="tab-btn" data-tab="focus">🎯 Focus</button>
+            <button class="tab-btn" data-tab="exercise">💪 Tập</button>
+            <button class="tab-btn" data-tab="settings">⚙️ Cài đặt</button>
+        </nav>
+
+        <!-- Tab: Timers -->
+        <section class="tab-content active" id="tab-timers">
+            <div class="timers-grid">
+                <div class="timer-card" data-type="walk">
+                    <div class="timer-icon">🚶</div>
+                    <div class="timer-info">
+                        <span class="timer-label">Đi bộ</span>
+                        <span class="timer-countdown" id="walkTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="walk" title="Reset">↻</button>
                 </div>
-                <button class="reset-btn" data-timer="walk" title="Reset">↻</button>
+
+                <div class="timer-card" data-type="water">
+                    <div class="timer-icon">💧</div>
+                    <div class="timer-info">
+                        <span class="timer-label">Uống nước</span>
+                        <span class="timer-countdown" id="waterTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="water" title="Reset">↻</button>
+                </div>
+
+                <div class="timer-card" data-type="eye_20_20_20">
+                    <div class="timer-icon">👁️</div>
+                    <div class="timer-info">
+                        <span class="timer-label">20-20-20</span>
+                        <span class="timer-countdown" id="eyeTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="eye_20_20_20" title="Reset">↻</button>
+                </div>
+
+                <div class="timer-card" data-type="blink">
+                    <div class="timer-icon">😊</div>
+                    <div class="timer-info">
+                        <span class="timer-label">Chớp mắt</span>
+                        <span class="timer-countdown" id="blinkTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="blink" title="Reset">↻</button>
+                </div>
+
+                <div class="timer-card" data-type="posture">
+                    <div class="timer-icon">🪑</div>
+                    <div class="timer-info">
+                        <span class="timer-label">Tư thế</span>
+                        <span class="timer-countdown" id="postureTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="posture" title="Reset">↻</button>
+                </div>
+
+                <div class="timer-card" data-type="neck_stretch">
+                    <div class="timer-icon">🧘</div>
+                    <div class="timer-info">
+                        <span class="timer-label">Giãn cổ</span>
+                        <span class="timer-countdown" id="neckTimer">--:--</span>
+                    </div>
+                    <button class="reset-btn" data-timer="neck_stretch" title="Reset">↻</button>
+                </div>
             </div>
-            
-            <div class="timer-card water" data-type="water">
-                <div class="timer-icon">💧</div>
-                <div class="timer-info">
-                    <span class="timer-label">Uống nước</span>
-                    <span class="timer-countdown" id="waterTimer">--:--</span>
-                </div>
-                <button class="reset-btn" data-timer="water" title="Reset">↻</button>
-            </div>
-            
-            <div class="timer-card toilet" data-type="toilet">
-                <div class="timer-icon">🚻</div>
-                <div class="timer-info">
-                    <span class="timer-label">Đi toilet</span>
-                    <span class="timer-countdown" id="toiletTimer">--:--</span>
-                </div>
-                <button class="reset-btn" data-timer="toilet" title="Reset">↻</button>
-            </div>
-            
-            <div class="timer-card eye" data-type="eye_20_20_20">
-                <div class="timer-icon">👁️</div>
-                <div class="timer-info">
-                    <span class="timer-label">20-20-20</span>
-                    <span class="timer-countdown" id="eyeTimer">--:--</span>
-                </div>
-                <button class="reset-btn" data-timer="eye_20_20_20" title="Reset">↻</button>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <button class="action-btn pause" id="btnPause">
+                    <span class="btn-icon" id="pauseIcon">⏸️</span>
+                    <span id="pauseText">Tạm dừng</span>
+                </button>
+                <button class="action-btn reset" id="btnResetAll">
+                    <span class="btn-icon">🔄</span>
+                    <span>Reset tất cả</span>
+                </button>
             </div>
         </section>
 
-        <!-- Quick Actions -->
-        <section class="actions-section">
-            <button class="action-btn pause" id="btnPause">
-                <span class="btn-icon" id="pauseIcon">⏸️</span>
-                <span id="pauseText">Tạm dừng</span>
-            </button>
-            <button class="action-btn reset" id="btnResetAll">
-                <span class="btn-icon">🔄</span>
-                <span>Reset tất cả</span>
-            </button>
+        <!-- Tab: Focus Mode & Pomodoro -->
+        <section class="tab-content" id="tab-focus">
+            <!-- Focus Mode -->
+            <div class="focus-section">
+                <h3 class="section-title">🎯 Focus Mode</h3>
+                <p class="section-desc">Tạm dừng tất cả nhắc nhở để tập trung</p>
+                <div class="focus-buttons">
+                    <button class="focus-btn" data-minutes="15">15 phút</button>
+                    <button class="focus-btn" data-minutes="30">30 phút</button>
+                    <button class="focus-btn" data-minutes="45">45 phút</button>
+                    <button class="focus-btn" data-minutes="60">60 phút</button>
+                </div>
+                <button class="stop-btn hidden" id="btnStopFocus">⏹️ Dừng Focus</button>
+                <div class="focus-status hidden" id="focusStatus">
+                    <span class="focus-icon">🎯</span>
+                    <span class="focus-time" id="focusTimeLeft">--:--</span>
+                </div>
+            </div>
+
+            <!-- Pomodoro -->
+            <div class="pomodoro-section">
+                <h3 class="section-title">🍅 Pomodoro Timer</h3>
+                <p class="section-desc">25 phút làm việc, 5 phút nghỉ</p>
+                <div class="pomodoro-display" id="pomodoroDisplay">
+                    <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+                    <div class="pomodoro-state" id="pomodoroState">Sẵn sàng</div>
+                </div>
+                <div class="pomodoro-buttons">
+                    <button class="pomodoro-btn start" id="btnStartPomodoro">▶️ Bắt đầu</button>
+                    <button class="pomodoro-btn stop hidden" id="btnStopPomodoro">⏹️ Dừng</button>
+                </div>
+                <div class="pomodoro-count">
+                    <span>📊 Hoàn thành hôm nay: </span>
+                    <span id="pomodoroCount">0</span>
+                </div>
+            </div>
         </section>
 
-        <!-- Exercise Menu -->
-        <section class="exercise-section">
+        <!-- Tab: Exercise -->
+        <section class="tab-content" id="tab-exercise">
             <h3 class="section-title">💪 Bài tập ngay</h3>
             <div class="exercise-grid">
-                <button class="exercise-btn" data-exercise="neck">🧘 Giãn cổ</button>
-                <button class="exercise-btn" data-exercise="shoulder">💪 Giãn vai</button>
-                <button class="exercise-btn" data-exercise="eye">👁️ Mắt</button>
-                <button class="exercise-btn" data-exercise="breathing">🌬️ Hít thở</button>
-                <button class="exercise-btn" data-exercise="posture">🪑 Tư thế</button>
-                <button class="exercise-btn" data-exercise="rule_20_20_20">👀 20-20-20</button>
+                <button class="exercise-btn" data-exercise="neck">
+                    <span class="ex-icon">🧘</span>
+                    <span class="ex-label">Giãn cổ</span>
+                </button>
+                <button class="exercise-btn" data-exercise="shoulder">
+                    <span class="ex-icon">💪</span>
+                    <span class="ex-label">Giãn vai</span>
+                </button>
+                <button class="exercise-btn" data-exercise="eye">
+                    <span class="ex-icon">👁️</span>
+                    <span class="ex-label">Bài tập mắt</span>
+                </button>
+                <button class="exercise-btn" data-exercise="breathing">
+                    <span class="ex-icon">🌬️</span>
+                    <span class="ex-label">Hít thở</span>
+                </button>
+                <button class="exercise-btn" data-exercise="posture">
+                    <span class="ex-icon">🪑</span>
+                    <span class="ex-label">Tư thế</span>
+                </button>
+                <button class="exercise-btn" data-exercise="rule_20_20_20">
+                    <span class="ex-icon">👀</span>
+                    <span class="ex-label">20-20-20</span>
+                </button>
+                <button class="exercise-btn" data-exercise="blink">
+                    <span class="ex-icon">😊</span>
+                    <span class="ex-label">Chớp mắt</span>
+                </button>
+                <button class="exercise-btn" data-exercise="stand_up">
+                    <span class="ex-icon">🚶</span>
+                    <span class="ex-label">Đứng dậy</span>
+                </button>
             </div>
         </section>
 
-        <!-- Settings -->
-        <section class="settings-section">
-            <div class="setting-item">
-                <label>
-                    <input type="checkbox" id="notificationEnabled" checked>
-                    🔔 Bật thông báo
-                </label>
+        <!-- Tab: Settings -->
+        <section class="tab-content" id="tab-settings">
+            <!-- Work Hours -->
+            <div class="settings-group">
+                <h3 class="section-title">📅 Giờ làm việc</h3>
+                <div class="setting-row">
+                    <label>Bắt đầu:</label>
+                    <input type="time" id="settingWorkStart" value="08:00">
+                </div>
+                <div class="setting-row">
+                    <label>Kết thúc:</label>
+                    <input type="time" id="settingWorkEnd" value="17:30">
+                </div>
+                <div class="setting-row">
+                    <label>Nghỉ trưa từ:</label>
+                    <input type="time" id="settingLunchStart" value="11:30">
+                </div>
+                <div class="setting-row">
+                    <label>Nghỉ trưa đến:</label>
+                    <input type="time" id="settingLunchEnd" value="13:00">
+                </div>
             </div>
-            <button class="test-btn" id="btnTest">📢 Test thông báo</button>
+
+            <!-- Weekend Mode -->
+            <div class="settings-group">
+                <h3 class="section-title">📆 Ngày làm việc</h3>
+                <div class="setting-row">
+                    <label>Chế độ:</label>
+                    <select id="settingWeekendMode">
+                        <option value="mon_fri">T2 - T6</option>
+                        <option value="mon_sat_full">T2 - T7 (cả ngày)</option>
+                        <option value="mon_sat_half">T2 - T7 (nửa ngày T7)</option>
+                        <option value="mon_sun_full">T2 - CN (cả ngày)</option>
+                        <option value="mon_sun_half">T2 - CN (nửa ngày CN)</option>
+                    </select>
+                </div>
+                <div class="setting-row half-day-setting hidden" id="saturdayEndRow">
+                    <label>T7 kết thúc:</label>
+                    <input type="time" id="settingSaturdayEnd" value="12:00">
+                </div>
+                <div class="setting-row half-day-setting hidden" id="sundayEndRow">
+                    <label>CN kết thúc:</label>
+                    <input type="time" id="settingSundayEnd" value="12:00">
+                </div>
+            </div>
+
+            <!-- Special Reminders -->
+            <div class="settings-group">
+                <h3 class="section-title">🌙 Nhắc nhở đặc biệt</h3>
+                <div class="setting-row">
+                    <label>Nhắc ngủ:</label>
+                    <input type="time" id="settingSleepTime" value="23:00">
+                </div>
+                <div class="setting-row">
+                    <label>Night Mode:</label>
+                    <input type="time" id="settingNightMode" value="18:00">
+                </div>
+            </div>
+
+            <!-- Intervals -->
+            <div class="settings-group">
+                <h3 class="section-title">⏱️ Thời gian nhắc (phút)</h3>
+                <div class="intervals-grid">
+                    <div class="interval-item">
+                        <label>🚶 Đi bộ</label>
+                        <input type="number" id="intervalWalk" min="5" max="120" value="30">
+                    </div>
+                    <div class="interval-item">
+                        <label>💧 Nước</label>
+                        <input type="number" id="intervalWater" min="5" max="120" value="45">
+                    </div>
+                    <div class="interval-item">
+                        <label>👁️ 20-20-20</label>
+                        <input type="number" id="intervalEye" min="5" max="60" value="20">
+                    </div>
+                    <div class="interval-item">
+                        <label>🪑 Tư thế</label>
+                        <input type="number" id="intervalPosture" min="5" max="120" value="45">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toggles -->
+            <div class="settings-group">
+                <h3 class="section-title">🔔 Thông báo</h3>
+                <div class="setting-row toggle-row">
+                    <label>Bật thông báo</label>
+                    <input type="checkbox" id="settingNotification" checked>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="settings-actions">
+                <button class="settings-btn save" id="btnSaveSettings">💾 Lưu cài đặt</button>
+                <button class="settings-btn reset" id="btnResetSettings">🔄 Đặt lại mặc định</button>
+                <button class="settings-btn test" id="btnTestNotification">📢 Test thông báo</button>
+            </div>
         </section>
 
         <!-- Footer -->
         <footer class="footer">
-            <span>Work Health Reminder Pro v1.0</span>
+            <span>Work Health Reminder PRO v3.0</span>
         </footer>
     </div>
 
@@ -133,6 +313,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
 
     <script src="exercises.js"></script>
     <script src="popup.js"></script>
