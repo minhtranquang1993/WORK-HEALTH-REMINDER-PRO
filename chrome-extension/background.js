@@ -619,8 +619,8 @@ function showNotification(type) {
         iconUrl: 'icons/icon128.png',
         title: reminder.title,
         message: reminder.message,
-        priority: 2,
-        requireInteraction: true
+        priority: 2
+        // Removed requireInteraction so notifications auto-dismiss after a few seconds
     });
 }
 
@@ -660,12 +660,7 @@ async function handleMessage(message) {
             return { success: true };
 
         case 'clearAllNotifications':
-            await chrome.notifications.getAll(async (notifications) => {
-                for (const id of Object.keys(notifications)) {
-                    await chrome.notifications.clear(id);
-                }
-            });
-            return { success: true };
+            return await handleClearAllNotifications();
 
         case 'startFocus':
             state.focusEndTime = Date.now() + message.minutes * 60 * 1000;
@@ -762,6 +757,29 @@ async function handleTogglePause() {
 // Reset all
 async function handleResetAll() {
     return await resetAllTimers();
+}
+
+// Clear all notifications
+async function handleClearAllNotifications() {
+    return new Promise((resolve) => {
+        chrome.notifications.getAll((notifications) => {
+            const ids = Object.keys(notifications);
+            if (ids.length === 0) {
+                resolve({ success: true, cleared: 0 });
+                return;
+            }
+
+            let cleared = 0;
+            ids.forEach((id) => {
+                chrome.notifications.clear(id, () => {
+                    cleared++;
+                    if (cleared === ids.length) {
+                        resolve({ success: true, cleared: cleared });
+                    }
+                });
+            });
+        });
+    });
 }
 
 // Initialize on startup
