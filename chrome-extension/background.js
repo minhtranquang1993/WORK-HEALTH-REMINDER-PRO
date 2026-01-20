@@ -659,9 +659,6 @@ async function handleMessage(message) {
             showNotification('walk');
             return { success: true };
 
-        case 'clearAllNotifications':
-            return await handleClearAllNotifications();
-
         case 'startFocus':
             state.focusEndTime = Date.now() + message.minutes * 60 * 1000;
             await chrome.storage.local.set({ state });
@@ -757,29 +754,6 @@ async function handleTogglePause() {
 // Reset all
 async function handleResetAll() {
     return await resetAllTimers();
-}
-
-// Clear all notifications
-async function handleClearAllNotifications() {
-    return new Promise((resolve) => {
-        chrome.notifications.getAll((notifications) => {
-            const ids = Object.keys(notifications);
-            if (ids.length === 0) {
-                resolve({ success: true, cleared: 0 });
-                return;
-            }
-
-            let cleared = 0;
-            ids.forEach((id) => {
-                chrome.notifications.clear(id, () => {
-                    cleared++;
-                    if (cleared === ids.length) {
-                        resolve({ success: true, cleared: cleared });
-                    }
-                });
-            });
-        });
-    });
 }
 
 // Initialize on startup
