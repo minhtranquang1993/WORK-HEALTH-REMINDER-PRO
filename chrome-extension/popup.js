@@ -37,6 +37,7 @@ class PopupController {
         this.pauseIcon = document.getElementById('pauseIcon');
         this.pauseText = document.getElementById('pauseText');
         this.btnResetAll = document.getElementById('btnResetAll');
+        this.btnClearNotifications = document.getElementById('btnClearNotifications');
 
         // Focus Mode
         this.btnStopFocus = document.getElementById('btnStopFocus');
@@ -104,6 +105,9 @@ class PopupController {
 
         // Reset all button
         this.btnResetAll.addEventListener('click', () => this.resetAll());
+
+        // Clear notifications button
+        this.btnClearNotifications.addEventListener('click', () => this.clearAllNotifications());
 
         // Focus Mode buttons
         document.querySelectorAll('.focus-btn').forEach(btn => {
@@ -342,6 +346,15 @@ class PopupController {
             this.showToast('🔄 Đã reset tất cả timer!');
         } catch (e) {
             console.log('Error resetting all:', e);
+        }
+    }
+
+    async clearAllNotifications() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'clearAllNotifications' });
+            this.showToast('🧹 Đã clear tất cả thông báo!');
+        } catch (e) {
+            console.log('Error clearing notifications:', e);
         }
     }
 

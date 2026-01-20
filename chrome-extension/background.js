@@ -659,6 +659,14 @@ async function handleMessage(message) {
             showNotification('walk');
             return { success: true };
 
+        case 'clearAllNotifications':
+            await chrome.notifications.getAll(async (notifications) => {
+                for (const id of Object.keys(notifications)) {
+                    await chrome.notifications.clear(id);
+                }
+            });
+            return { success: true };
+
         case 'startFocus':
             state.focusEndTime = Date.now() + message.minutes * 60 * 1000;
             await chrome.storage.local.set({ state });

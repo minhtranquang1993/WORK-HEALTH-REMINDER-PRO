@@ -272,6 +272,11 @@ body {
     color: #e0e0e0;
 }
 
+.action-btn.clear {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
 .action-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
