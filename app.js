@@ -10,9 +10,9 @@ class WorkHealthReminder {
         this.LUNCH_END = { hour: 13, minute: 0 };
         this.WORK_END = { hour: 17, minute: 30 };
         
-        // Reminder intervals (in minutes)
-        this.WALK_INTERVAL = 30;
-        this.WATER_INTERVAL = 45;
+        // Reminder intervals (in minutes) - Based on scientific recommendations
+        this.WALK_INTERVAL = 30;    // Columbia University: 5-min walk every 30 min
+        this.WATER_INTERVAL = 30;   // Hydration experts: drink regularly every 20-30 min
         this.TOILET_INTERVAL = 60;
         
         // Timers (remaining seconds)

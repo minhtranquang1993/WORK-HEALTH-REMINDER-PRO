@@ -26,9 +26,9 @@ LUNCH_START = (11, 30)   # 11:30 - Nghỉ trưa
 WORK_RESUME = (13, 0)    # 13:00 - Làm việc lại
 WORK_END = (17, 30)      # 17:30
 
-# Khoảng thời gian nhắc nhở (phút)
-WALK_INTERVAL = 30       # Đứng dậy đi bộ
-WATER_INTERVAL = 45      # Uống nước
+# Khoảng thời gian nhắc nhở (phút) - Based on scientific recommendations
+WALK_INTERVAL = 30       # Đứng dậy đi bộ (Columbia University: every 30 min)
+WATER_INTERVAL = 30      # Uống nước (Hydration experts: every 20-30 min)
 TOILET_INTERVAL = 60     # Đi toilet
 
 # Biến theo dõi thời gian

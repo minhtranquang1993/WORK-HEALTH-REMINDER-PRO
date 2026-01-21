@@ -61,13 +61,14 @@ class WorkConfig:
 
 @dataclass
 class ReminderInterval:
-    walk: int = 30
-    water: int = 45
+    # Based on scientific recommendations
+    walk: int = 30           # Columbia University: 5-min walk every 30 min
+    water: int = 30          # Hydration experts: drink regularly every 20-30 min
     toilet: int = 60
-    eye_20_20_20: int = 20
-    blink: int = 15
-    posture: int = 45
-    neck_stretch: int = 60
+    eye_20_20_20: int = 20   # AAO 20-20-20 rule: every 20 min
+    blink: int = 2           # Research: blink reminder every 1-2 min during screen use
+    posture: int = 20        # Cornell 20-8-2 rule: check posture every 20 min
+    neck_stretch: int = 30   # Ergonomics: stretch every 20-30 min
     eye_exercise: int = 90
     breathing: int = 120
 
@@ -154,12 +155,12 @@ def load_config() -> tuple:
 
         reminder_intervals = ReminderInterval(
             walk=intervals.get("walk", 30),
-            water=intervals.get("water", 45),
+            water=intervals.get("water", 30),
             toilet=intervals.get("toilet", 60),
             eye_20_20_20=intervals.get("eye_20_20_20", 20),
-            blink=intervals.get("blink", 15),
-            posture=intervals.get("posture", 45),
-            neck_stretch=intervals.get("neck_stretch", 60),
+            blink=intervals.get("blink", 2),
+            posture=intervals.get("posture", 20),
+            neck_stretch=intervals.get("neck_stretch", 30),
             eye_exercise=intervals.get("eye_exercise", 90),
             breathing=intervals.get("breathing", 120),
         )
