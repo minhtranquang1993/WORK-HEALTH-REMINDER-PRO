@@ -8,6 +8,8 @@ class YouTubeController {
         this.video = null;
         this.initialized = false;
         this.updateInterval = null;
+        this.isShorts = false;
+        this.adSkipperInterval = null;
         this.init();
     }
 
@@ -23,11 +25,22 @@ class YouTubeController {
 
         // Observe for SPA navigation (YouTube is a SPA)
         this.observeNavigation();
+
+        // Start ad skipper
+        this.initAdSkipper();
     }
 
     waitForVideo() {
         const checkVideo = () => {
-            this.video = document.querySelector('video.html5-main-video');
+            // Try multiple selectors for different YouTube pages including Shorts
+            this.video = document.querySelector('video.html5-main-video') ||
+                         document.querySelector('#shorts-player video') ||
+                         document.querySelector('ytd-reel-video-renderer video') ||
+                         document.querySelector('#player video');
+
+            // Detect if this is a Shorts page
+            this.isShorts = window.location.pathname.startsWith('/shorts/');
+
             if (this.video) {
                 this.setupVideoListeners();
                 this.initialized = true;
@@ -50,9 +63,12 @@ class YouTubeController {
                 // Reset and wait for new video
                 this.video = null;
                 this.initialized = false;
+                this.isShorts = false;
                 if (this.updateInterval) {
                     clearInterval(this.updateInterval);
                 }
+                // Restart ad skipper for new page
+                this.initAdSkipper();
                 setTimeout(() => this.waitForVideo(), 1000);
             }
         });
@@ -83,39 +99,67 @@ class YouTubeController {
     getVideoInfo() {
         if (!this.video) return null;
 
-        // Try multiple selectors for title (YouTube changes DOM frequently)
-        const titleSelectors = [
-            'h1.ytd-video-primary-info-renderer yt-formatted-string',
-            'h1.title yt-formatted-string',
-            'h1.ytd-watch-metadata yt-formatted-string',
-            '#title h1 yt-formatted-string',
-            'ytd-watch-metadata h1 yt-formatted-string'
-        ];
-
         let titleElement = null;
-        for (const selector of titleSelectors) {
-            titleElement = document.querySelector(selector);
-            if (titleElement && titleElement.textContent.trim()) break;
-        }
-
-        // Try multiple selectors for channel
-        const channelSelectors = [
-            '#channel-name a',
-            'ytd-channel-name a',
-            '#owner #channel-name a',
-            'ytd-video-owner-renderer #channel-name a'
-        ];
-
         let channelElement = null;
-        for (const selector of channelSelectors) {
-            channelElement = document.querySelector(selector);
-            if (channelElement && channelElement.textContent.trim()) break;
+
+        if (this.isShorts) {
+            // Shorts-specific selectors
+            const shortsTitleSelectors = [
+                'ytd-reel-video-renderer h2.ytd-reel-player-header-renderer',
+                'ytd-reel-video-renderer yt-formatted-string.ytd-reel-player-header-renderer',
+                '#overlay h2',
+                'h2.title',
+                'yt-formatted-string#text'
+            ];
+
+            for (const selector of shortsTitleSelectors) {
+                titleElement = document.querySelector(selector);
+                if (titleElement && titleElement.textContent.trim()) break;
+            }
+
+            const shortsChannelSelectors = [
+                'ytd-reel-video-renderer ytd-channel-name a',
+                'ytd-reel-video-renderer #channel-name a',
+                '#channel-name yt-formatted-string a',
+                '.ytd-reel-player-header-renderer a'
+            ];
+
+            for (const selector of shortsChannelSelectors) {
+                channelElement = document.querySelector(selector);
+                if (channelElement && channelElement.textContent.trim()) break;
+            }
+        } else {
+            // Regular video selectors
+            const titleSelectors = [
+                'h1.ytd-video-primary-info-renderer yt-formatted-string',
+                'h1.title yt-formatted-string',
+                'h1.ytd-watch-metadata yt-formatted-string',
+                '#title h1 yt-formatted-string',
+                'ytd-watch-metadata h1 yt-formatted-string'
+            ];
+
+            for (const selector of titleSelectors) {
+                titleElement = document.querySelector(selector);
+                if (titleElement && titleElement.textContent.trim()) break;
+            }
+
+            const channelSelectors = [
+                '#channel-name a',
+                'ytd-channel-name a',
+                '#owner #channel-name a',
+                'ytd-video-owner-renderer #channel-name a'
+            ];
+
+            for (const selector of channelSelectors) {
+                channelElement = document.querySelector(selector);
+                if (channelElement && channelElement.textContent.trim()) break;
+            }
         }
 
         const videoId = this.getVideoId();
 
         return {
-            title: titleElement?.textContent?.trim() || 'Video YouTube',
+            title: titleElement?.textContent?.trim() || (this.isShorts ? 'YouTube Shorts' : 'Video YouTube'),
             channel: channelElement?.textContent?.trim() || 'YouTube',
             duration: this.video.duration || 0,
             currentTime: this.video.currentTime || 0,
@@ -124,12 +168,21 @@ class YouTubeController {
             isMuted: this.video.muted,
             url: window.location.href,
             videoId: videoId,
-            thumbnailUrl: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null
+            thumbnailUrl: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null,
+            isShorts: this.isShorts
         };
     }
 
     getVideoId() {
         const url = new URL(window.location.href);
+
+        // Check for Shorts URL format: /shorts/VIDEO_ID
+        if (url.pathname.startsWith('/shorts/')) {
+            const parts = url.pathname.split('/');
+            return parts[2] || null;
+        }
+
+        // Regular video URL format: ?v=VIDEO_ID
         return url.searchParams.get('v') || null;
     }
 
@@ -149,8 +202,49 @@ class YouTubeController {
         }
     }
 
+    // ========================================
+    // Ad Skipper
+    // ========================================
+    initAdSkipper() {
+        // Clear existing interval if any
+        if (this.adSkipperInterval) {
+            clearInterval(this.adSkipperInterval);
+        }
+
+        // Check for skip button every 500ms
+        this.adSkipperInterval = setInterval(() => {
+            this.trySkipAd();
+        }, 500);
+    }
+
+    trySkipAd() {
+        // YouTube ad skip button selectors
+        const skipSelectors = [
+            '.ytp-ad-skip-button',
+            '.ytp-ad-skip-button-modern',
+            '.ytp-skip-ad-button',
+            'button.ytp-ad-skip-button-text',
+            '.ytp-ad-skip-button-container button',
+            '[class*="skip-button"]'
+        ];
+
+        for (const selector of skipSelectors) {
+            const skipBtn = document.querySelector(selector);
+            // Check if button exists and is visible (offsetParent !== null)
+            if (skipBtn && skipBtn.offsetParent !== null) {
+                skipBtn.click();
+                console.log('[Health Reminder] Ad skipped');
+                return;
+            }
+        }
+    }
+
     handleMessage(message, sendResponse) {
         switch (message.action) {
+            case 'ping':
+                sendResponse({ success: true, ready: this.initialized, hasVideo: !!this.video });
+                break;
+
             case 'youtube_getState':
                 sendResponse({ success: true, videoInfo: this.getVideoInfo() });
                 break;

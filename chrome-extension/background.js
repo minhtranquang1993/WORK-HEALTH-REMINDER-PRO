@@ -790,6 +790,28 @@ async function handleResetAll() {
 // YouTube Control Functions
 // ========================================
 
+// Ensure content script is injected in a YouTube tab
+async function ensureContentScriptInjected(tabId) {
+    try {
+        // Try to ping the content script
+        const response = await chrome.tabs.sendMessage(tabId, { action: 'ping' });
+        return { success: true, ready: response?.ready, injected: false };
+    } catch (e) {
+        // Content script not present, inject it
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId },
+                files: ['youtube-content.js']
+            });
+            // Wait a bit for the script to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return { success: true, ready: false, injected: true };
+        } catch (injectionError) {
+            return { success: false, error: injectionError.message };
+        }
+    }
+}
+
 // Get YouTube state
 async function handleGetYoutubeState() {
     try {
@@ -802,6 +824,18 @@ async function handleGetYoutubeState() {
 
         // Prefer active YouTube tab, otherwise use the first one
         const youtubeTab = tabs.find(t => t.active) || tabs[0];
+
+        // Ensure content script is injected
+        const injectionResult = await ensureContentScriptInjected(youtubeTab.id);
+        if (!injectionResult.success) {
+            return {
+                success: true,
+                hasYoutube: true,
+                tabId: youtubeTab.id,
+                videoInfo: youtubeState.videoInfo,
+                error: injectionResult.error
+            };
+        }
 
         try {
             // Try to get fresh state from content script
@@ -844,6 +878,12 @@ async function handleYoutubeControl(message) {
         }
 
         const youtubeTab = tabs.find(t => t.active) || tabs[0];
+
+        // Ensure content script is injected
+        const injectionResult = await ensureContentScriptInjected(youtubeTab.id);
+        if (!injectionResult.success) {
+            return { success: false, error: injectionResult.error };
+        }
 
         try {
             const response = await chrome.tabs.sendMessage(youtubeTab.id, {

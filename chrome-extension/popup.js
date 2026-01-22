@@ -107,6 +107,10 @@ class PopupController {
 
         // YouTube update counter (to update less frequently)
         this.youtubeUpdateCounter = 0;
+
+        // YouTube video duration (for seek calculation)
+        this.youtubeVideoDuration = 0;
+        this.isSeekDragging = false;
     }
 
     initEventListeners() {
@@ -175,6 +179,23 @@ class PopupController {
         }
         if (this.youtubeVolumeSlider) {
             this.youtubeVolumeSlider.addEventListener('input', (e) => this.youtubeSetVolume(e.target.value / 100));
+        }
+
+        // YouTube progress bar seek (click and drag)
+        if (this.youtubeProgressBar) {
+            this.youtubeProgressBar.addEventListener('click', (e) => this.handleProgressClick(e));
+            this.youtubeProgressBar.addEventListener('mousedown', (e) => {
+                this.isSeekDragging = true;
+                this.handleProgressClick(e);
+            });
+            document.addEventListener('mouseup', () => {
+                this.isSeekDragging = false;
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (this.isSeekDragging) {
+                    this.handleProgressDrag(e);
+                }
+            });
         }
     }
 
@@ -507,8 +528,11 @@ class PopupController {
                 this.youtubeDuration.textContent = this.formatYoutubeTime(info.duration);
             }
 
-            // Update progress bar
-            if (this.youtubeProgressFill && info.duration > 0) {
+            // Store duration for seek calculations
+            this.youtubeVideoDuration = info.duration;
+
+            // Update progress bar (only if not dragging)
+            if (this.youtubeProgressFill && info.duration > 0 && !this.isSeekDragging) {
                 const progress = (info.currentTime / info.duration) * 100;
                 this.youtubeProgressFill.style.width = `${progress}%`;
             }
@@ -608,6 +632,52 @@ class PopupController {
             });
         } catch (e) {
             console.log('Error setting volume:', e);
+        }
+    }
+
+    handleProgressClick(e) {
+        if (!this.youtubeProgressBar || !this.youtubeVideoDuration) return;
+
+        const rect = this.youtubeProgressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const seekTime = percent * this.youtubeVideoDuration;
+        this.youtubeSeek(seekTime);
+
+        // Update progress bar immediately for visual feedback
+        if (this.youtubeProgressFill) {
+            this.youtubeProgressFill.style.width = `${percent * 100}%`;
+        }
+    }
+
+    handleProgressDrag(e) {
+        if (!this.youtubeProgressBar || !this.youtubeVideoDuration) return;
+
+        const rect = this.youtubeProgressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const seekTime = percent * this.youtubeVideoDuration;
+
+        // Update progress bar immediately
+        if (this.youtubeProgressFill) {
+            this.youtubeProgressFill.style.width = `${percent * 100}%`;
+        }
+
+        // Update current time display
+        if (this.youtubeCurrentTime) {
+            this.youtubeCurrentTime.textContent = this.formatYoutubeTime(seekTime);
+        }
+
+        this.youtubeSeek(seekTime);
+    }
+
+    async youtubeSeek(time) {
+        try {
+            await chrome.runtime.sendMessage({
+                action: 'youtubeControl',
+                command: 'seek',
+                params: { time }
+            });
+        } catch (e) {
+            console.log('Error seeking:', e);
         }
     }
 
