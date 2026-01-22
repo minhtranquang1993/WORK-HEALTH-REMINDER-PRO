@@ -42,7 +42,8 @@
             <button class="tab-btn active" data-tab="timers">⏱️ Timer</button>
             <button class="tab-btn" data-tab="focus">🎯 Focus</button>
             <button class="tab-btn" data-tab="exercise">💪 Tập</button>
-            <button class="tab-btn" data-tab="settings">⚙️ Cài đặt</button>
+            <button class="tab-btn" data-tab="youtube">📺 YouTube</button>
+            <button class="tab-btn" data-tab="settings">⚙️</button>
         </nav>
 
         <!-- Tab: Timers -->
@@ -190,6 +191,59 @@
                     <span class="ex-icon">🚶</span>
                     <span class="ex-label">Đứng dậy</span>
                 </button>
+            </div>
+        </section>
+
+        <!-- Tab: YouTube -->
+        <section class="tab-content" id="tab-youtube">
+            <!-- No YouTube State -->
+            <div class="youtube-empty" id="youtubeEmpty">
+                <div class="youtube-empty-icon">📺</div>
+                <p class="youtube-empty-text">Không tìm thấy tab YouTube</p>
+                <p class="youtube-empty-hint">Mở YouTube trên Chrome để điều khiển video</p>
+                <button class="youtube-open-btn" id="btnOpenYoutube">Mở YouTube</button>
+            </div>
+
+            <!-- YouTube Player Info -->
+            <div class="youtube-player hidden" id="youtubePlayer">
+                <div class="youtube-thumbnail">
+                    <img id="youtubeThumbnail" src="" alt="Video thumbnail">
+                    <div class="youtube-duration" id="youtubeDuration">0:00</div>
+                </div>
+
+                <div class="youtube-info">
+                    <h3 class="youtube-title" id="youtubeTitle">Video Title</h3>
+                    <p class="youtube-channel" id="youtubeChannel">Channel Name</p>
+                </div>
+
+                <div class="youtube-progress">
+                    <div class="youtube-progress-bar" id="youtubeProgressBar">
+                        <div class="youtube-progress-fill" id="youtubeProgressFill"></div>
+                    </div>
+                    <div class="youtube-time">
+                        <span id="youtubeCurrentTime">0:00</span>
+                        <span id="youtubeTotalTime">0:00</span>
+                    </div>
+                </div>
+
+                <div class="youtube-controls">
+                    <button class="youtube-btn" id="btnYoutubePrev" title="Video trước">
+                        <span class="btn-icon">⏮️</span>
+                    </button>
+                    <button class="youtube-btn play-pause" id="btnYoutubePlayPause" title="Play/Pause">
+                        <span class="btn-icon" id="youtubePlayIcon">▶️</span>
+                    </button>
+                    <button class="youtube-btn" id="btnYoutubeNext" title="Video tiếp">
+                        <span class="btn-icon">⏭️</span>
+                    </button>
+                </div>
+
+                <div class="youtube-volume">
+                    <button class="youtube-btn volume" id="btnYoutubeMute" title="Mute">
+                        <span class="btn-icon" id="youtubeVolumeIcon">🔊</span>
+                    </button>
+                    <input type="range" id="youtubeVolumeSlider" min="0" max="100" value="100">
+                </div>
             </div>
         </section>
 

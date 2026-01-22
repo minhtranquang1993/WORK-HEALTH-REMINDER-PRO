@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 from pathlib import Path
 import sys
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 try:
     import rumps
@@ -71,6 +72,131 @@ class ReminderInterval:
     neck_stretch: int = 30   # Ergonomics: stretch every 20-30 min
     eye_exercise: int = 90
     breathing: int = 120
+
+
+# ============================================
+# YOUTUBE STATE & HTTP SERVER
+# ============================================
+
+# HTTP port for Chrome extension communication
+YOUTUBE_HTTP_PORT = 9876
+
+@dataclass
+class YouTubeState:
+    """Trang thai YouTube tu Chrome Extension"""
+    title: str = ""
+    channel: str = ""
+    duration: float = 0
+    current_time: float = 0
+    is_playing: bool = False
+    volume: float = 1.0
+    is_muted: bool = False
+    url: str = ""
+    last_update: float = 0
+
+# Global YouTube state
+youtube_state = YouTubeState()
+
+
+class YouTubeHTTPHandler(BaseHTTPRequestHandler):
+    """HTTP handler for Chrome Extension communication"""
+
+    def log_message(self, format, *args):
+        pass  # Suppress logging
+
+    def send_cors_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight"""
+        self.send_response(200)
+        self.send_cors_headers()
+        self.end_headers()
+
+    def do_POST(self):
+        """Handle POST requests from extension"""
+        global youtube_state
+
+        if self.path == '/youtube/state':
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data.decode('utf-8'))
+
+                youtube_state = YouTubeState(
+                    title=data.get('title', ''),
+                    channel=data.get('channel', ''),
+                    duration=data.get('duration', 0),
+                    current_time=data.get('currentTime', 0),
+                    is_playing=data.get('isPlaying', False),
+                    volume=data.get('volume', 1.0),
+                    is_muted=data.get('isMuted', False),
+                    url=data.get('url', ''),
+                    last_update=time.time()
+                )
+
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': True}).encode())
+            except Exception as e:
+                self.send_response(400)
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+        else:
+            self.send_response(404)
+            self.send_cors_headers()
+            self.end_headers()
+
+    def do_GET(self):
+        """Handle GET requests"""
+        global youtube_state
+
+        if self.path == '/youtube/state':
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+
+            data = {
+                'title': youtube_state.title,
+                'channel': youtube_state.channel,
+                'duration': youtube_state.duration,
+                'currentTime': youtube_state.current_time,
+                'isPlaying': youtube_state.is_playing,
+                'volume': youtube_state.volume,
+                'isMuted': youtube_state.is_muted,
+                'url': youtube_state.url,
+                'lastUpdate': youtube_state.last_update,
+                'isStale': (time.time() - youtube_state.last_update) > 5
+            }
+            self.wfile.write(json.dumps(data).encode())
+
+        elif self.path == '/health':
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'status': 'ok'}).encode())
+
+        else:
+            self.send_response(404)
+            self.send_cors_headers()
+            self.end_headers()
+
+
+def run_youtube_http_server():
+    """Run HTTP server in background thread"""
+    try:
+        server = HTTPServer(('localhost', YOUTUBE_HTTP_PORT), YouTubeHTTPHandler)
+        print(f"YouTube HTTP server running on localhost:{YOUTUBE_HTTP_PORT}")
+        server.serve_forever()
+    except Exception as e:
+        print(f"Could not start YouTube HTTP server: {e}")
 
 
 # Config path
@@ -575,8 +701,27 @@ class HealthReminderApp(rumps.App):
         self.quick_menu.add(rumps.MenuItem("👁️ Đã nhìn xa", callback=self.reset_eye))
         self.quick_menu.add(rumps.MenuItem("🔄 Reset tất cả", callback=self.reset_all_timers))
 
+        # YouTube submenu
+        self.youtube_menu = rumps.MenuItem("📺 YouTube")
+        self.youtube_status = rumps.MenuItem("Không có video")
+        self.youtube_title = rumps.MenuItem("--")
+        self.youtube_playpause = rumps.MenuItem("▶️ Play/Pause", callback=self.youtube_play_pause)
+        self.youtube_next = rumps.MenuItem("⏭️ Video tiếp", callback=self.youtube_next_video)
+        self.youtube_prev = rumps.MenuItem("⏮️ Video trước", callback=self.youtube_prev_video)
+
+        self.youtube_menu.add(self.youtube_status)
+        self.youtube_menu.add(self.youtube_title)
+        self.youtube_menu.add(None)
+        self.youtube_menu.add(self.youtube_playpause)
+        self.youtube_menu.add(self.youtube_next)
+        self.youtube_menu.add(self.youtube_prev)
+
         # Settings - build dynamically
         self.build_settings_menu()
+
+        # Start YouTube HTTP server
+        self.youtube_http_thread = threading.Thread(target=run_youtube_http_server, daemon=True)
+        self.youtube_http_thread.start()
 
         # Build menu
         self.menu = [
@@ -589,6 +734,7 @@ class HealthReminderApp(rumps.App):
             self.pomodoro_menu,
             None,
             self.exercise_menu,
+            self.youtube_menu,
             self.quick_menu,
             None,
             self.settings_menu,
@@ -730,7 +876,10 @@ class HealthReminderApp(rumps.App):
                 self.next_reminder.title = "⏱️ Nhắc tiếp: --"
         else:
             self.next_reminder.title = "⏱️ Nhắc tiếp: --"
-    
+
+        # Update YouTube menu
+        self.update_youtube_menu()
+
     def get_next_reminders(self) -> dict:
         """Lấy thời gian đến nhắc nhở tiếp theo"""
         reminders = {}
@@ -865,6 +1014,87 @@ class HealthReminderApp(rumps.App):
                 self.start_pomodoro(None)
             else:
                 self.stop_pomodoro(None)
+
+    # ============================================
+    # YOUTUBE CONTROL
+    # ============================================
+
+    def update_youtube_menu(self):
+        """Cap nhat menu YouTube"""
+        global youtube_state
+
+        # Check if data is stale (more than 5 seconds old)
+        is_stale = (time.time() - youtube_state.last_update) > 5
+
+        if is_stale or not youtube_state.title:
+            self.youtube_status.title = "Không có video"
+            self.youtube_title.title = "Mở YouTube trong Chrome"
+            self.youtube_playpause.title = "▶️ Play/Pause"
+        else:
+            # Truncate title if too long
+            title = youtube_state.title
+            if len(title) > 35:
+                title = title[:32] + "..."
+
+            status = "▶️ Đang phát" if youtube_state.is_playing else "⏸️ Tạm dừng"
+            self.youtube_status.title = status
+            self.youtube_title.title = f"🎵 {title}"
+            self.youtube_playpause.title = "⏸️ Pause" if youtube_state.is_playing else "▶️ Play"
+
+    def send_youtube_command(self, command: str):
+        """Send command to YouTube via Chrome AppleScript"""
+        # Use AppleScript to send keystrokes to Chrome
+        if command == "playPause":
+            # Send 'k' key (YouTube shortcut for play/pause)
+            script = '''
+            tell application "Google Chrome"
+                activate
+                tell application "System Events"
+                    keystroke "k"
+                end tell
+            end tell
+            '''
+        elif command == "next":
+            # Send Shift+N key (YouTube shortcut for next)
+            script = '''
+            tell application "Google Chrome"
+                activate
+                tell application "System Events"
+                    keystroke "n" using shift down
+                end tell
+            end tell
+            '''
+        elif command == "prev":
+            # Send Shift+P key (YouTube shortcut for previous)
+            script = '''
+            tell application "Google Chrome"
+                activate
+                tell application "System Events"
+                    keystroke "p" using shift down
+                end tell
+            end tell
+            '''
+        else:
+            return
+
+        try:
+            subprocess.run(['osascript', '-e', script], capture_output=True)
+        except Exception as e:
+            print(f"Error sending YouTube command: {e}")
+
+    def youtube_play_pause(self, _):
+        """Toggle YouTube play/pause"""
+        self.send_youtube_command("playPause")
+
+    def youtube_next_video(self, _):
+        """Skip to next YouTube video"""
+        self.send_youtube_command("next")
+        send_notification("📺 YouTube", "Chuyển video tiếp theo")
+
+    def youtube_prev_video(self, _):
+        """Go to previous YouTube video"""
+        self.send_youtube_command("prev")
+        send_notification("📺 YouTube", "Quay lại video trước")
 
     # ============================================
     # SETTINGS EDIT

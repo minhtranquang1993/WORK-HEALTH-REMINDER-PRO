@@ -83,6 +83,30 @@ class PopupController {
 
         // Toast
         this.toast = document.getElementById('toast');
+
+        // YouTube elements
+        this.youtubeEmpty = document.getElementById('youtubeEmpty');
+        this.youtubePlayer = document.getElementById('youtubePlayer');
+        this.youtubeThumbnail = document.getElementById('youtubeThumbnail');
+        this.youtubeTitle = document.getElementById('youtubeTitle');
+        this.youtubeChannel = document.getElementById('youtubeChannel');
+        this.youtubeCurrentTime = document.getElementById('youtubeCurrentTime');
+        this.youtubeTotalTime = document.getElementById('youtubeTotalTime');
+        this.youtubeDuration = document.getElementById('youtubeDuration');
+        this.youtubeProgressFill = document.getElementById('youtubeProgressFill');
+        this.youtubeProgressBar = document.getElementById('youtubeProgressBar');
+        this.youtubePlayIcon = document.getElementById('youtubePlayIcon');
+        this.youtubeVolumeIcon = document.getElementById('youtubeVolumeIcon');
+        this.youtubeVolumeSlider = document.getElementById('youtubeVolumeSlider');
+
+        this.btnOpenYoutube = document.getElementById('btnOpenYoutube');
+        this.btnYoutubePrev = document.getElementById('btnYoutubePrev');
+        this.btnYoutubePlayPause = document.getElementById('btnYoutubePlayPause');
+        this.btnYoutubeNext = document.getElementById('btnYoutubeNext');
+        this.btnYoutubeMute = document.getElementById('btnYoutubeMute');
+
+        // YouTube update counter (to update less frequently)
+        this.youtubeUpdateCounter = 0;
     }
 
     initEventListeners() {
@@ -132,6 +156,26 @@ class PopupController {
         this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
         this.btnTestNotification.addEventListener('click', () => this.testNotification());
+
+        // YouTube controls
+        if (this.btnOpenYoutube) {
+            this.btnOpenYoutube.addEventListener('click', () => this.openYoutube());
+        }
+        if (this.btnYoutubePlayPause) {
+            this.btnYoutubePlayPause.addEventListener('click', () => this.youtubePlayPause());
+        }
+        if (this.btnYoutubeNext) {
+            this.btnYoutubeNext.addEventListener('click', () => this.youtubeNext());
+        }
+        if (this.btnYoutubePrev) {
+            this.btnYoutubePrev.addEventListener('click', () => this.youtubePrev());
+        }
+        if (this.btnYoutubeMute) {
+            this.btnYoutubeMute.addEventListener('click', () => this.youtubeMute());
+        }
+        if (this.youtubeVolumeSlider) {
+            this.youtubeVolumeSlider.addEventListener('input', (e) => this.youtubeSetVolume(e.target.value / 100));
+        }
     }
 
     switchTab(tabName) {
@@ -169,6 +213,12 @@ class PopupController {
             }
         } catch (e) {
             console.log('Error getting status:', e);
+        }
+
+        // Update YouTube (every 2 seconds to reduce load)
+        this.youtubeUpdateCounter++;
+        if (this.youtubeUpdateCounter % 2 === 0) {
+            this.updateYoutubeDisplay();
         }
     }
 
@@ -412,7 +462,158 @@ class PopupController {
         }, 2000);
     }
 
+    // ========================================
+    // YouTube Methods
+    // ========================================
+
+    async updateYoutubeDisplay() {
+        if (!this.youtubeEmpty || !this.youtubePlayer) return;
+
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getYoutubeState' });
+
+            if (!response || !response.hasYoutube || !response.videoInfo) {
+                this.youtubeEmpty.classList.remove('hidden');
+                this.youtubePlayer.classList.add('hidden');
+                return;
+            }
+
+            this.youtubeEmpty.classList.add('hidden');
+            this.youtubePlayer.classList.remove('hidden');
+
+            const info = response.videoInfo;
+
+            // Update title and channel
+            if (this.youtubeTitle) {
+                this.youtubeTitle.textContent = info.title || 'Video YouTube';
+            }
+            if (this.youtubeChannel) {
+                this.youtubeChannel.textContent = info.channel || 'YouTube';
+            }
+
+            // Update thumbnail
+            if (this.youtubeThumbnail && info.thumbnailUrl) {
+                this.youtubeThumbnail.src = info.thumbnailUrl;
+            }
+
+            // Update time displays
+            if (this.youtubeCurrentTime) {
+                this.youtubeCurrentTime.textContent = this.formatYoutubeTime(info.currentTime);
+            }
+            if (this.youtubeTotalTime) {
+                this.youtubeTotalTime.textContent = this.formatYoutubeTime(info.duration);
+            }
+            if (this.youtubeDuration) {
+                this.youtubeDuration.textContent = this.formatYoutubeTime(info.duration);
+            }
+
+            // Update progress bar
+            if (this.youtubeProgressFill && info.duration > 0) {
+                const progress = (info.currentTime / info.duration) * 100;
+                this.youtubeProgressFill.style.width = `${progress}%`;
+            }
+
+            // Update play/pause icon
+            if (this.youtubePlayIcon) {
+                this.youtubePlayIcon.textContent = info.isPlaying ? '⏸️' : '▶️';
+            }
+
+            // Update volume
+            if (this.youtubeVolumeIcon) {
+                if (info.isMuted) {
+                    this.youtubeVolumeIcon.textContent = '🔇';
+                } else if (info.volume > 0.5) {
+                    this.youtubeVolumeIcon.textContent = '🔊';
+                } else if (info.volume > 0) {
+                    this.youtubeVolumeIcon.textContent = '🔉';
+                } else {
+                    this.youtubeVolumeIcon.textContent = '🔈';
+                }
+            }
+            if (this.youtubeVolumeSlider) {
+                this.youtubeVolumeSlider.value = info.isMuted ? 0 : Math.round(info.volume * 100);
+            }
+
+        } catch (e) {
+            // Silently fail - extension might not be ready
+            this.youtubeEmpty.classList.remove('hidden');
+            this.youtubePlayer.classList.add('hidden');
+        }
+    }
+
+    formatYoutubeTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        if (hours > 0) {
+            return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    async openYoutube() {
+        try {
+            await chrome.tabs.create({ url: 'https://www.youtube.com' });
+        } catch (e) {
+            console.log('Error opening YouTube:', e);
+        }
+    }
+
+    async youtubePlayPause() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'playPause' });
+            setTimeout(() => this.updateYoutubeDisplay(), 100);
+        } catch (e) {
+            console.log('Error toggling play/pause:', e);
+        }
+    }
+
+    async youtubeNext() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'next' });
+            this.showToast('⏭️ Video tiếp theo');
+            setTimeout(() => this.updateYoutubeDisplay(), 500);
+        } catch (e) {
+            console.log('Error skipping to next:', e);
+        }
+    }
+
+    async youtubePrev() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'prev' });
+            this.showToast('⏮️ Video trước');
+            setTimeout(() => this.updateYoutubeDisplay(), 500);
+        } catch (e) {
+            console.log('Error going to previous:', e);
+        }
+    }
+
+    async youtubeMute() {
+        try {
+            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'toggleMute' });
+            setTimeout(() => this.updateYoutubeDisplay(), 100);
+        } catch (e) {
+            console.log('Error toggling mute:', e);
+        }
+    }
+
+    async youtubeSetVolume(volume) {
+        try {
+            await chrome.runtime.sendMessage({
+                action: 'youtubeControl',
+                command: 'setVolume',
+                params: { volume }
+            });
+        } catch (e) {
+            console.log('Error setting volume:', e);
+        }
+    }
+
+    // ========================================
     // Settings
+    // ========================================
     async loadSettings() {
         try {
             const response = await chrome.runtime.sendMessage({ action: 'getSettings' });

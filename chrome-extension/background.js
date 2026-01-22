@@ -61,6 +61,16 @@ let state = {
     workStartedToday: false
 };
 
+// YouTube state management
+let youtubeState = {
+    tabId: null,
+    videoInfo: null,
+    lastUpdate: null
+};
+
+// Menubar app HTTP port
+const MENUBAR_HTTP_PORT = 9876;
+
 // Alarm names
 const ALARMS = {
     WALK: 'walk_reminder',
@@ -629,8 +639,21 @@ chrome.notifications.onClicked.addListener((notificationId) => {
     chrome.notifications.clear(notificationId);
 });
 
-// Handle messages from popup
+// Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Handle YouTube state updates from content script
+    if (message.action === 'youtubeStateUpdate') {
+        youtubeState.tabId = sender.tab?.id;
+        youtubeState.videoInfo = message.videoInfo;
+        youtubeState.lastUpdate = Date.now();
+
+        // Notify menubar app (fire and forget)
+        notifyMenubarApp();
+
+        sendResponse({ success: true });
+        return true;
+    }
+
     handleMessage(message).then(sendResponse);
     return true;
 });
@@ -695,6 +718,13 @@ async function handleMessage(message) {
             setupAlarms();
             return { success: true };
 
+        // YouTube handlers
+        case 'getYoutubeState':
+            return await handleGetYoutubeState();
+
+        case 'youtubeControl':
+            return await handleYoutubeControl(message);
+
         default:
             return { success: false, error: 'Unknown action' };
     }
@@ -754,6 +784,94 @@ async function handleTogglePause() {
 // Reset all
 async function handleResetAll() {
     return await resetAllTimers();
+}
+
+// ========================================
+// YouTube Control Functions
+// ========================================
+
+// Get YouTube state
+async function handleGetYoutubeState() {
+    try {
+        // Find YouTube tabs
+        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
+
+        if (tabs.length === 0) {
+            return { success: true, hasYoutube: false, videoInfo: null };
+        }
+
+        // Prefer active YouTube tab, otherwise use the first one
+        const youtubeTab = tabs.find(t => t.active) || tabs[0];
+
+        try {
+            // Try to get fresh state from content script
+            const response = await chrome.tabs.sendMessage(youtubeTab.id, { action: 'youtube_getState' });
+            if (response && response.success) {
+                youtubeState.tabId = youtubeTab.id;
+                youtubeState.videoInfo = response.videoInfo;
+                youtubeState.lastUpdate = Date.now();
+            }
+            return {
+                success: true,
+                hasYoutube: true,
+                tabId: youtubeTab.id,
+                videoInfo: response?.videoInfo || youtubeState.videoInfo
+            };
+        } catch (e) {
+            // Content script may not be ready, return cached state
+            return {
+                success: true,
+                hasYoutube: true,
+                tabId: youtubeTab.id,
+                videoInfo: youtubeState.videoInfo,
+                cached: true
+            };
+        }
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// Send YouTube control command
+async function handleYoutubeControl(message) {
+    const { command, params } = message;
+
+    try {
+        // Find YouTube tabs
+        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
+        if (tabs.length === 0) {
+            return { success: false, error: 'No YouTube tab found' };
+        }
+
+        const youtubeTab = tabs.find(t => t.active) || tabs[0];
+
+        try {
+            const response = await chrome.tabs.sendMessage(youtubeTab.id, {
+                action: `youtube_${command}`,
+                ...params
+            });
+            return response;
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// Notify menubar app about YouTube state (fire and forget)
+async function notifyMenubarApp() {
+    if (!youtubeState.videoInfo) return;
+
+    try {
+        await fetch(`http://localhost:${MENUBAR_HTTP_PORT}/youtube/state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(youtubeState.videoInfo)
+        });
+    } catch (e) {
+        // Menubar app not running, ignore silently
+    }
 }
 
 // Initialize on startup

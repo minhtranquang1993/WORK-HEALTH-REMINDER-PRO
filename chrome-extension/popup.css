@@ -730,6 +730,209 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* ========================================
+   YouTube Tab Styles
+   ======================================== */
+
+/* YouTube Empty State */
+.youtube-empty {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.youtube-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.youtube-empty-text {
+    font-size: 14px;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.youtube-empty-hint {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 16px;
+}
+
+.youtube-open-btn {
+    background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.youtube-open-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+}
+
+/* YouTube Player */
+.youtube-player {
+    padding: 4px;
+}
+
+.youtube-thumbnail {
+    position: relative;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.youtube-thumbnail img {
+    width: 100%;
+    height: auto;
+    display: block;
+    min-height: 150px;
+    object-fit: cover;
+}
+
+.youtube-duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Consolas', monospace;
+}
+
+.youtube-info {
+    margin-bottom: 10px;
+}
+
+.youtube-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.youtube-channel {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.youtube-progress {
+    margin-bottom: 12px;
+}
+
+.youtube-progress-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.youtube-progress-fill {
+    height: 100%;
+    background: #ff0000;
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.youtube-time {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 4px;
+    font-family: 'Consolas', monospace;
+}
+
+.youtube-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.youtube-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.youtube-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.youtube-btn.play-pause {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+    font-size: 18px;
+}
+
+.youtube-btn.play-pause:hover {
+    box-shadow: 0 4px 12px rgba(255, 0, 0, 0.4);
+}
+
+.youtube-volume {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.youtube-btn.volume {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+}
+
+#youtubeVolumeSlider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    outline: none;
+}
+
+#youtubeVolumeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#youtubeVolumeSlider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
 /* Input focus styles */
 input:focus, select:focus {
     outline: none;

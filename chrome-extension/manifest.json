@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Work Health Reminder Pro",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Nhắc nhở chăm sóc sức khỏe khi làm việc: đi bộ, uống nước, bài tập mắt, giãn cơ và nhiều hơn nữa!",
   "author": "Work Health Team",
   "icons": {
@@ -23,6 +23,20 @@
   "permissions": [
     "alarms",
     "notifications",
-    "storage"
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://youtube.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"],
+      "js": ["youtube-content.js"],
+      "run_at": "document_idle"
+    }
   ]
 }
