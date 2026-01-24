@@ -10,6 +10,8 @@ class YouTubeController {
         this.updateInterval = null;
         this.isShorts = false;
         this.adSkipperInterval = null;
+        this.focusModeActive = false;
+        this.focusCheckInterval = null;
         this.init();
     }
 
@@ -79,9 +81,54 @@ class YouTubeController {
     setupVideoListeners() {
         if (!this.video) return;
 
-        ['play', 'pause', 'loadedmetadata', 'ended', 'volumechange'].forEach(event => {
+        ['play', 'pause', 'loadedmetadata', 'ended', 'volumechange', 'ratechange'].forEach(event => {
             this.video.addEventListener(event, () => this.sendStateUpdate());
         });
+
+        // Block play when Focus mode is active
+        this.video.addEventListener('play', () => this.checkAndBlockIfFocusMode());
+
+        // Start periodic focus mode check
+        this.startFocusModeCheck();
+    }
+
+    // Check focus mode status and pause if active
+    async checkAndBlockIfFocusMode() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getFocusStatus' });
+            if (response && response.isFocusActive) {
+                this.focusModeActive = true;
+                // Pause the video immediately
+                if (this.video && !this.video.paused) {
+                    this.video.pause();
+                    console.log('[Focus Mode] Video paused - Focus mode is active');
+                }
+            } else {
+                this.focusModeActive = false;
+            }
+        } catch (e) {
+            // Extension context may be invalid, ignore
+        }
+    }
+
+    // Periodically check focus mode status
+    startFocusModeCheck() {
+        if (this.focusCheckInterval) {
+            clearInterval(this.focusCheckInterval);
+        }
+        // Check every 2 seconds
+        this.focusCheckInterval = setInterval(() => this.updateFocusModeStatus(), 2000);
+    }
+
+    async updateFocusModeStatus() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getFocusStatus' });
+            if (response) {
+                this.focusModeActive = response.isFocusActive;
+            }
+        } catch (e) {
+            // Extension context may be invalid, ignore
+        }
     }
 
     startPeriodicUpdate() {
@@ -166,6 +213,7 @@ class YouTubeController {
             isPlaying: !this.video.paused,
             volume: this.video.volume,
             isMuted: this.video.muted,
+            playbackRate: this.video.playbackRate || 1,
             url: window.location.href,
             videoId: videoId,
             thumbnailUrl: videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : null,
@@ -308,6 +356,26 @@ class YouTubeController {
                 if (this.video) {
                     this.video.currentTime = message.time;
                     sendResponse({ success: true, currentTime: this.video.currentTime });
+                } else {
+                    sendResponse({ success: false, error: 'No video found' });
+                }
+                break;
+
+            case 'youtube_setSpeed':
+                if (this.video) {
+                    const speed = Math.max(0.25, Math.min(2, message.speed));
+                    this.video.playbackRate = speed;
+                    // Also try to use YouTube's player API if available
+                    try {
+                        const player = document.querySelector('#movie_player');
+                        if (player && player.setPlaybackRate) {
+                            player.setPlaybackRate(speed);
+                        }
+                    } catch (e) {
+                        // Ignore if YouTube API not available
+                    }
+                    this.sendStateUpdate();
+                    sendResponse({ success: true, playbackRate: this.video.playbackRate });
                 } else {
                     sendResponse({ success: false, error: 'No video found' });
                 }

@@ -86,13 +86,12 @@ class PopupController {
 
         // YouTube elements
         this.youtubeEmpty = document.getElementById('youtubeEmpty');
-        this.youtubePlayer = document.getElementById('youtubePlayer');
-        this.youtubeThumbnail = document.getElementById('youtubeThumbnail');
-        this.youtubeTitle = document.getElementById('youtubeTitle');
-        this.youtubeChannel = document.getElementById('youtubeChannel');
+        this.youtubeTabsContainer = document.getElementById('youtubeTabsContainer');
+        this.youtubeTabsList = document.getElementById('youtubeTabsList');
+        this.youtubeTabsCount = document.getElementById('youtubeTabsCount');
+        this.youtubeControlsSection = document.getElementById('youtubeControlsSection');
         this.youtubeCurrentTime = document.getElementById('youtubeCurrentTime');
         this.youtubeTotalTime = document.getElementById('youtubeTotalTime');
-        this.youtubeDuration = document.getElementById('youtubeDuration');
         this.youtubeProgressFill = document.getElementById('youtubeProgressFill');
         this.youtubeProgressBar = document.getElementById('youtubeProgressBar');
         this.youtubePlayIcon = document.getElementById('youtubePlayIcon');
@@ -104,6 +103,7 @@ class PopupController {
         this.btnYoutubePlayPause = document.getElementById('btnYoutubePlayPause');
         this.btnYoutubeNext = document.getElementById('btnYoutubeNext');
         this.btnYoutubeMute = document.getElementById('btnYoutubeMute');
+        this.youtubeSpeedSelect = document.getElementById('youtubeSpeedSelect');
 
         // YouTube update counter (to update less frequently)
         this.youtubeUpdateCounter = 0;
@@ -111,6 +111,9 @@ class PopupController {
         // YouTube video duration (for seek calculation)
         this.youtubeVideoDuration = 0;
         this.isSeekDragging = false;
+
+        // Track selected YouTube tab
+        this.selectedYoutubeTabId = null;
     }
 
     initEventListeners() {
@@ -179,6 +182,9 @@ class PopupController {
         }
         if (this.youtubeVolumeSlider) {
             this.youtubeVolumeSlider.addEventListener('input', (e) => this.youtubeSetVolume(e.target.value / 100));
+        }
+        if (this.youtubeSpeedSelect) {
+            this.youtubeSpeedSelect.addEventListener('change', (e) => this.youtubeSetSpeed(parseFloat(e.target.value)));
         }
 
         // YouTube progress bar seek (click and drag)
@@ -488,80 +494,173 @@ class PopupController {
     // ========================================
 
     async updateYoutubeDisplay() {
-        if (!this.youtubeEmpty || !this.youtubePlayer) return;
+        if (!this.youtubeEmpty || !this.youtubeTabsContainer) return;
 
         try {
-            const response = await chrome.runtime.sendMessage({ action: 'getYoutubeState' });
+            // Get all YouTube tabs
+            const tabsResponse = await chrome.runtime.sendMessage({ action: 'getAllYoutubeTabs' });
 
-            if (!response || !response.hasYoutube || !response.videoInfo) {
+            if (!tabsResponse || !tabsResponse.success || tabsResponse.tabs.length === 0) {
                 this.youtubeEmpty.classList.remove('hidden');
-                this.youtubePlayer.classList.add('hidden');
+                this.youtubeTabsContainer.classList.add('hidden');
                 return;
             }
 
             this.youtubeEmpty.classList.add('hidden');
-            this.youtubePlayer.classList.remove('hidden');
+            this.youtubeTabsContainer.classList.remove('hidden');
 
-            const info = response.videoInfo;
-
-            // Update title and channel
-            if (this.youtubeTitle) {
-                this.youtubeTitle.textContent = info.title || 'Video YouTube';
-            }
-            if (this.youtubeChannel) {
-                this.youtubeChannel.textContent = info.channel || 'YouTube';
+            // Update tabs count
+            if (this.youtubeTabsCount) {
+                this.youtubeTabsCount.textContent = tabsResponse.tabs.length;
             }
 
-            // Update thumbnail
-            if (this.youtubeThumbnail && info.thumbnailUrl) {
-                this.youtubeThumbnail.src = info.thumbnailUrl;
-            }
+            // Update selected tab ID
+            this.selectedYoutubeTabId = tabsResponse.selectedTabId;
 
-            // Update time displays
-            if (this.youtubeCurrentTime) {
-                this.youtubeCurrentTime.textContent = this.formatYoutubeTime(info.currentTime);
-            }
-            if (this.youtubeTotalTime) {
-                this.youtubeTotalTime.textContent = this.formatYoutubeTime(info.duration);
-            }
-            if (this.youtubeDuration) {
-                this.youtubeDuration.textContent = this.formatYoutubeTime(info.duration);
-            }
+            // Render tabs list
+            this.renderYoutubeTabs(tabsResponse.tabs);
 
-            // Store duration for seek calculations
-            this.youtubeVideoDuration = info.duration;
+            // Get and display state for selected tab
+            if (this.selectedYoutubeTabId) {
+                const stateResponse = await chrome.runtime.sendMessage({ action: 'getYoutubeState' });
 
-            // Update progress bar (only if not dragging)
-            if (this.youtubeProgressFill && info.duration > 0 && !this.isSeekDragging) {
-                const progress = (info.currentTime / info.duration) * 100;
-                this.youtubeProgressFill.style.width = `${progress}%`;
-            }
-
-            // Update play/pause icon
-            if (this.youtubePlayIcon) {
-                this.youtubePlayIcon.textContent = info.isPlaying ? '⏸️' : '▶️';
-            }
-
-            // Update volume
-            if (this.youtubeVolumeIcon) {
-                if (info.isMuted) {
-                    this.youtubeVolumeIcon.textContent = '🔇';
-                } else if (info.volume > 0.5) {
-                    this.youtubeVolumeIcon.textContent = '🔊';
-                } else if (info.volume > 0) {
-                    this.youtubeVolumeIcon.textContent = '🔉';
+                if (stateResponse && stateResponse.videoInfo) {
+                    this.updateYoutubeControls(stateResponse.videoInfo);
+                    if (this.youtubeControlsSection) {
+                        this.youtubeControlsSection.classList.remove('hidden');
+                    }
                 } else {
-                    this.youtubeVolumeIcon.textContent = '🔈';
+                    if (this.youtubeControlsSection) {
+                        this.youtubeControlsSection.classList.add('hidden');
+                    }
                 }
-            }
-            if (this.youtubeVolumeSlider) {
-                this.youtubeVolumeSlider.value = info.isMuted ? 0 : Math.round(info.volume * 100);
             }
 
         } catch (e) {
-            // Silently fail - extension might not be ready
+            console.log('Error updating YouTube display:', e);
             this.youtubeEmpty.classList.remove('hidden');
-            this.youtubePlayer.classList.add('hidden');
+            this.youtubeTabsContainer.classList.add('hidden');
+        }
+    }
+
+    renderYoutubeTabs(tabs) {
+        if (!this.youtubeTabsList) return;
+
+        this.youtubeTabsList.innerHTML = tabs.map(tab => `
+            <div class="youtube-tab-item ${tab.tabId === this.selectedYoutubeTabId ? 'selected' : ''}"
+                 data-tab-id="${tab.tabId}">
+                <span class="youtube-tab-status">${tab.isPlaying ? '▶️' : '⏸️'}</span>
+                <span class="youtube-tab-title" title="${this.escapeHtml(tab.title)}">
+                    ${this.escapeHtml(tab.title)}
+                </span>
+                <button class="youtube-tab-close" data-tab-id="${tab.tabId}" title="Đóng tab">✕</button>
+            </div>
+        `).join('');
+
+        // Add click listeners for selection
+        this.youtubeTabsList.querySelectorAll('.youtube-tab-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Don't select if clicking close button
+                if (e.target.classList.contains('youtube-tab-close')) return;
+                this.selectYoutubeTab(parseInt(item.dataset.tabId));
+            });
+        });
+
+        // Add click listeners for close buttons
+        this.youtubeTabsList.querySelectorAll('.youtube-tab-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeYoutubeTab(parseInt(btn.dataset.tabId));
+            });
+        });
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    updateYoutubeControls(info) {
+        // Update time displays
+        if (this.youtubeCurrentTime) {
+            this.youtubeCurrentTime.textContent = this.formatYoutubeTime(info.currentTime);
+        }
+        if (this.youtubeTotalTime) {
+            this.youtubeTotalTime.textContent = this.formatYoutubeTime(info.duration);
+        }
+
+        // Store duration for seek calculations
+        this.youtubeVideoDuration = info.duration;
+
+        // Update progress bar (only if not dragging)
+        if (this.youtubeProgressFill && info.duration > 0 && !this.isSeekDragging) {
+            const progress = (info.currentTime / info.duration) * 100;
+            this.youtubeProgressFill.style.width = `${progress}%`;
+        }
+
+        // Update play/pause icon
+        if (this.youtubePlayIcon) {
+            this.youtubePlayIcon.textContent = info.isPlaying ? '⏸️' : '▶️';
+        }
+
+        // Update volume
+        if (this.youtubeVolumeIcon) {
+            if (info.isMuted) {
+                this.youtubeVolumeIcon.textContent = '🔇';
+            } else if (info.volume > 0.5) {
+                this.youtubeVolumeIcon.textContent = '🔊';
+            } else if (info.volume > 0) {
+                this.youtubeVolumeIcon.textContent = '🔉';
+            } else {
+                this.youtubeVolumeIcon.textContent = '🔈';
+            }
+        }
+        if (this.youtubeVolumeSlider) {
+            this.youtubeVolumeSlider.value = info.isMuted ? 0 : Math.round(info.volume * 100);
+        }
+
+        // Update speed selector - find closest matching value
+        if (this.youtubeSpeedSelect && info.playbackRate) {
+            const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+            const closest = speeds.reduce((prev, curr) =>
+                Math.abs(curr - info.playbackRate) < Math.abs(prev - info.playbackRate) ? curr : prev
+            );
+            this.youtubeSpeedSelect.value = closest.toString();
+        }
+    }
+
+    async selectYoutubeTab(tabId) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'selectYoutubeTab',
+                tabId: tabId
+            });
+
+            if (response && response.success) {
+                this.selectedYoutubeTabId = tabId;
+                // Refresh display
+                await this.updateYoutubeDisplay();
+            }
+        } catch (e) {
+            console.log('Error selecting YouTube tab:', e);
+        }
+    }
+
+    async closeYoutubeTab(tabId) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'closeYoutubeTab',
+                tabId: tabId
+            });
+
+            if (response && response.success) {
+                this.showToast('Đã đóng tab YouTube');
+                // Refresh display
+                await this.updateYoutubeDisplay();
+            }
+        } catch (e) {
+            console.log('Error closing YouTube tab:', e);
         }
     }
 
@@ -587,7 +686,11 @@ class PopupController {
 
     async youtubePlayPause() {
         try {
-            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'playPause' });
+            const response = await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'playPause' });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+                return;
+            }
             setTimeout(() => this.updateYoutubeDisplay(), 100);
         } catch (e) {
             console.log('Error toggling play/pause:', e);
@@ -596,7 +699,11 @@ class PopupController {
 
     async youtubeNext() {
         try {
-            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'next' });
+            const response = await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'next' });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+                return;
+            }
             this.showToast('⏭️ Video tiếp theo');
             setTimeout(() => this.updateYoutubeDisplay(), 500);
         } catch (e) {
@@ -606,7 +713,11 @@ class PopupController {
 
     async youtubePrev() {
         try {
-            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'prev' });
+            const response = await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'prev' });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+                return;
+            }
             this.showToast('⏮️ Video trước');
             setTimeout(() => this.updateYoutubeDisplay(), 500);
         } catch (e) {
@@ -616,7 +727,11 @@ class PopupController {
 
     async youtubeMute() {
         try {
-            await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'toggleMute' });
+            const response = await chrome.runtime.sendMessage({ action: 'youtubeControl', command: 'toggleMute' });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+                return;
+            }
             setTimeout(() => this.updateYoutubeDisplay(), 100);
         } catch (e) {
             console.log('Error toggling mute:', e);
@@ -625,13 +740,31 @@ class PopupController {
 
     async youtubeSetVolume(volume) {
         try {
-            await chrome.runtime.sendMessage({
+            const response = await chrome.runtime.sendMessage({
                 action: 'youtubeControl',
                 command: 'setVolume',
                 params: { volume }
             });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+            }
         } catch (e) {
             console.log('Error setting volume:', e);
+        }
+    }
+
+    async youtubeSetSpeed(speed) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'youtubeControl',
+                command: 'setSpeed',
+                params: { speed }
+            });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+            }
+        } catch (e) {
+            console.log('Error setting speed:', e);
         }
     }
 
@@ -671,11 +804,14 @@ class PopupController {
 
     async youtubeSeek(time) {
         try {
-            await chrome.runtime.sendMessage({
+            const response = await chrome.runtime.sendMessage({
                 action: 'youtubeControl',
                 command: 'seek',
                 params: { time }
             });
+            if (response?.focusBlocked) {
+                this.showToast('🎯 Focus mode đang bật!');
+            }
         } catch (e) {
             console.log('Error seeking:', e);
         }

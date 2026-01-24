@@ -884,26 +884,32 @@ body {
     font-family: 'Consolas', monospace;
 }
 
+.youtube-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
 .youtube-controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 8px;
 }
 
 .youtube-btn {
     background: rgba(255, 255, 255, 0.1);
     border: none;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .youtube-btn:hover {
@@ -912,10 +918,10 @@ body {
 }
 
 .youtube-btn.play-pause {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .youtube-btn.play-pause:hover {
@@ -925,20 +931,51 @@ body {
 .youtube-volume {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
+    gap: 6px;
+    width: 100px;
+}
+
+/* YouTube Speed Control */
+.youtube-speed {
+    display: flex;
+    align-items: center;
+}
+
+.youtube-speed select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 6px;
+    cursor: pointer;
+    width: 60px;
+    text-align: center;
+}
+
+.youtube-speed select:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.youtube-speed select:focus {
+    outline: none;
+    border-color: #ff0000;
+}
+
+.youtube-speed select option {
+    background: #1a1a2e;
+    color: #fff;
 }
 
 .youtube-btn.volume {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+    flex-shrink: 0;
 }
 
 #youtubeVolumeSlider {
-    flex: 1;
+    width: 60px;
     height: 4px;
     -webkit-appearance: none;
     background: rgba(255, 255, 255, 0.2);
@@ -963,4 +1000,120 @@ body {
 input:focus, select:focus {
     outline: none;
     border-color: #4facfe !important;
+}
+
+/* ========================================
+   YouTube Tabs List Styles
+   ======================================== */
+
+/* YouTube Tabs List Container */
+.youtube-tabs-container {
+    padding: 8px;
+}
+
+.youtube-tabs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.youtube-tabs-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.youtube-tabs-count {
+    background: rgba(255, 0, 0, 0.2);
+    color: #ff6b6b;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* YouTube Tabs List */
+.youtube-tabs-list {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+
+/* Individual Tab Item */
+.youtube-tab-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.youtube-tab-item:last-child {
+    margin-bottom: 0;
+}
+
+.youtube-tab-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.youtube-tab-item.selected {
+    background: rgba(255, 0, 0, 0.15);
+    border-color: rgba(255, 0, 0, 0.3);
+}
+
+.youtube-tab-item.selected .youtube-tab-title {
+    color: #ff6b6b;
+}
+
+/* Playing indicator */
+.youtube-tab-status {
+    width: 20px;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.youtube-tab-title {
+    flex: 1;
+    font-size: 12px;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 8px;
+}
+
+.youtube-tab-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.youtube-tab-close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+/* Controls Section */
+.youtube-controls-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 8px;
 }

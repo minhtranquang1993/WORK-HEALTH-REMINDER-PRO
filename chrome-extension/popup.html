@@ -40,9 +40,9 @@
         <!-- Tabs Navigation -->
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="timers">⏱️ Timer</button>
+            <button class="tab-btn" data-tab="youtube">📺 YouTube</button>
             <button class="tab-btn" data-tab="focus">🎯 Focus</button>
             <button class="tab-btn" data-tab="exercise">💪 Tập</button>
-            <button class="tab-btn" data-tab="youtube">📺 YouTube</button>
             <button class="tab-btn" data-tab="settings">⚙️</button>
         </nav>
 
@@ -204,45 +204,64 @@
                 <button class="youtube-open-btn" id="btnOpenYoutube">Mở YouTube</button>
             </div>
 
-            <!-- YouTube Player Info -->
-            <div class="youtube-player hidden" id="youtubePlayer">
-                <div class="youtube-thumbnail">
-                    <img id="youtubeThumbnail" src="" alt="Video thumbnail">
-                    <div class="youtube-duration" id="youtubeDuration">0:00</div>
+            <!-- YouTube Tabs List -->
+            <div class="youtube-tabs-container hidden" id="youtubeTabsContainer">
+                <!-- Tabs List Header -->
+                <div class="youtube-tabs-header">
+                    <span class="youtube-tabs-title">Các tab YouTube</span>
+                    <span class="youtube-tabs-count" id="youtubeTabsCount">0</span>
                 </div>
 
-                <div class="youtube-info">
-                    <h3 class="youtube-title" id="youtubeTitle">Video Title</h3>
-                    <p class="youtube-channel" id="youtubeChannel">Channel Name</p>
+                <!-- Tabs List -->
+                <div class="youtube-tabs-list" id="youtubeTabsList">
+                    <!-- Tab items will be inserted here dynamically -->
                 </div>
 
-                <div class="youtube-progress">
-                    <div class="youtube-progress-bar" id="youtubeProgressBar">
-                        <div class="youtube-progress-fill" id="youtubeProgressFill"></div>
+                <!-- Selected Tab Controls -->
+                <div class="youtube-controls-section" id="youtubeControlsSection">
+                    <div class="youtube-progress">
+                        <div class="youtube-progress-bar" id="youtubeProgressBar">
+                            <div class="youtube-progress-fill" id="youtubeProgressFill"></div>
+                        </div>
+                        <div class="youtube-time">
+                            <span id="youtubeCurrentTime">0:00</span>
+                            <span id="youtubeTotalTime">0:00</span>
+                        </div>
                     </div>
-                    <div class="youtube-time">
-                        <span id="youtubeCurrentTime">0:00</span>
-                        <span id="youtubeTotalTime">0:00</span>
+
+                    <div class="youtube-controls-row">
+                        <div class="youtube-volume">
+                            <button class="youtube-btn volume" id="btnYoutubeMute" title="Mute">
+                                <span class="btn-icon" id="youtubeVolumeIcon">🔊</span>
+                            </button>
+                            <input type="range" id="youtubeVolumeSlider" min="0" max="100" value="100">
+                        </div>
+
+                        <div class="youtube-controls">
+                            <button class="youtube-btn" id="btnYoutubePrev" title="Video trước">
+                                <span class="btn-icon">⏮️</span>
+                            </button>
+                            <button class="youtube-btn play-pause" id="btnYoutubePlayPause" title="Play/Pause">
+                                <span class="btn-icon" id="youtubePlayIcon">▶️</span>
+                            </button>
+                            <button class="youtube-btn" id="btnYoutubeNext" title="Video tiếp">
+                                <span class="btn-icon">⏭️</span>
+                            </button>
+                        </div>
+
+                        <div class="youtube-speed">
+                            <select id="youtubeSpeedSelect" title="Tốc độ phát">
+                                <option value="0.25">0.25x</option>
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="1.75">1.75x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-
-                <div class="youtube-controls">
-                    <button class="youtube-btn" id="btnYoutubePrev" title="Video trước">
-                        <span class="btn-icon">⏮️</span>
-                    </button>
-                    <button class="youtube-btn play-pause" id="btnYoutubePlayPause" title="Play/Pause">
-                        <span class="btn-icon" id="youtubePlayIcon">▶️</span>
-                    </button>
-                    <button class="youtube-btn" id="btnYoutubeNext" title="Video tiếp">
-                        <span class="btn-icon">⏭️</span>
-                    </button>
-                </div>
-
-                <div class="youtube-volume">
-                    <button class="youtube-btn volume" id="btnYoutubeMute" title="Mute">
-                        <span class="btn-icon" id="youtubeVolumeIcon">🔊</span>
-                    </button>
-                    <input type="range" id="youtubeVolumeSlider" min="0" max="100" value="100">
                 </div>
             </div>
         </section>

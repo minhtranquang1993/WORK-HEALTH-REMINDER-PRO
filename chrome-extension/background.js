@@ -63,8 +63,8 @@ let state = {
 
 // YouTube state management
 let youtubeState = {
-    tabId: null,
-    videoInfo: null,
+    selectedTabId: null,  // Currently selected tab for controls
+    tabs: {},             // Map of tabId -> videoInfo
     lastUpdate: null
 };
 
@@ -643,12 +643,14 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Handle YouTube state updates from content script
     if (message.action === 'youtubeStateUpdate') {
-        youtubeState.tabId = sender.tab?.id;
-        youtubeState.videoInfo = message.videoInfo;
-        youtubeState.lastUpdate = Date.now();
+        const tabId = sender.tab?.id;
+        if (tabId) {
+            youtubeState.tabs[tabId] = message.videoInfo;
+            youtubeState.lastUpdate = Date.now();
+        }
 
         // Notify menubar app (fire and forget)
-        notifyMenubarApp();
+        notifyMenubarApp(message.videoInfo);
 
         sendResponse({ success: true });
         return true;
@@ -685,12 +687,18 @@ async function handleMessage(message) {
         case 'startFocus':
             state.focusEndTime = Date.now() + message.minutes * 60 * 1000;
             await chrome.storage.local.set({ state });
+            // Pause all YouTube videos when entering focus mode
+            await pauseAllYoutubeTabs();
             return { success: true, focusEndTime: state.focusEndTime };
 
         case 'stopFocus':
             state.focusEndTime = null;
             await chrome.storage.local.set({ state });
             return { success: true };
+
+        case 'getFocusStatus':
+            const isFocusActive = state.focusEndTime && Date.now() < state.focusEndTime;
+            return { success: true, isFocusActive: !!isFocusActive, focusEndTime: state.focusEndTime };
 
         case 'startPomodoro':
             state.pomodoroState = 'work';
@@ -724,6 +732,15 @@ async function handleMessage(message) {
 
         case 'youtubeControl':
             return await handleYoutubeControl(message);
+
+        case 'getAllYoutubeTabs':
+            return await handleGetAllYoutubeTabs();
+
+        case 'selectYoutubeTab':
+            return await handleSelectYoutubeTab(message.tabId);
+
+        case 'closeYoutubeTab':
+            return await handleCloseYoutubeTab(message.tabId);
 
         default:
             return { success: false, error: 'Unknown action' };
@@ -790,6 +807,34 @@ async function handleResetAll() {
 // YouTube Control Functions
 // ========================================
 
+// Pause all YouTube tabs (used when entering Focus mode)
+async function pauseAllYoutubeTabs() {
+    try {
+        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
+
+        for (const tab of tabs) {
+            try {
+                // Ensure content script is injected
+                await ensureContentScriptInjected(tab.id);
+
+                // Get current state to check if playing
+                const stateResponse = await chrome.tabs.sendMessage(tab.id, { action: 'youtube_getState' });
+
+                // Only pause if currently playing
+                if (stateResponse?.videoInfo?.isPlaying) {
+                    await chrome.tabs.sendMessage(tab.id, { action: 'youtube_playPause' });
+                    console.log(`[Focus Mode] Paused YouTube tab: ${tab.id}`);
+                }
+            } catch (e) {
+                // Tab may not have video or content script not ready, ignore
+                console.log(`[Focus Mode] Could not pause tab ${tab.id}:`, e.message);
+            }
+        }
+    } catch (e) {
+        console.log('[Focus Mode] Error pausing YouTube tabs:', e.message);
+    }
+}
+
 // Ensure content script is injected in a YouTube tab
 async function ensureContentScriptInjected(tabId) {
     try {
@@ -812,52 +857,53 @@ async function ensureContentScriptInjected(tabId) {
     }
 }
 
-// Get YouTube state
+// Get YouTube state for selected tab
 async function handleGetYoutubeState() {
     try {
-        // Find YouTube tabs
-        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
-
-        if (tabs.length === 0) {
+        if (!youtubeState.selectedTabId) {
             return { success: true, hasYoutube: false, videoInfo: null };
         }
 
-        // Prefer active YouTube tab, otherwise use the first one
-        const youtubeTab = tabs.find(t => t.active) || tabs[0];
+        // Check if selected tab still exists
+        try {
+            await chrome.tabs.get(youtubeState.selectedTabId);
+        } catch (e) {
+            youtubeState.selectedTabId = null;
+            return { success: true, hasYoutube: false, videoInfo: null };
+        }
 
         // Ensure content script is injected
-        const injectionResult = await ensureContentScriptInjected(youtubeTab.id);
+        const injectionResult = await ensureContentScriptInjected(youtubeState.selectedTabId);
         if (!injectionResult.success) {
             return {
                 success: true,
                 hasYoutube: true,
-                tabId: youtubeTab.id,
-                videoInfo: youtubeState.videoInfo,
+                tabId: youtubeState.selectedTabId,
+                videoInfo: youtubeState.tabs[youtubeState.selectedTabId],
                 error: injectionResult.error
             };
         }
 
         try {
             // Try to get fresh state from content script
-            const response = await chrome.tabs.sendMessage(youtubeTab.id, { action: 'youtube_getState' });
+            const response = await chrome.tabs.sendMessage(youtubeState.selectedTabId, { action: 'youtube_getState' });
             if (response && response.success) {
-                youtubeState.tabId = youtubeTab.id;
-                youtubeState.videoInfo = response.videoInfo;
+                youtubeState.tabs[youtubeState.selectedTabId] = response.videoInfo;
                 youtubeState.lastUpdate = Date.now();
             }
             return {
                 success: true,
                 hasYoutube: true,
-                tabId: youtubeTab.id,
-                videoInfo: response?.videoInfo || youtubeState.videoInfo
+                tabId: youtubeState.selectedTabId,
+                videoInfo: response?.videoInfo || youtubeState.tabs[youtubeState.selectedTabId]
             };
         } catch (e) {
             // Content script may not be ready, return cached state
             return {
                 success: true,
                 hasYoutube: true,
-                tabId: youtubeTab.id,
-                videoInfo: youtubeState.videoInfo,
+                tabId: youtubeState.selectedTabId,
+                videoInfo: youtubeState.tabs[youtubeState.selectedTabId],
                 cached: true
             };
         }
@@ -868,25 +914,35 @@ async function handleGetYoutubeState() {
 
 // Send YouTube control command
 async function handleYoutubeControl(message) {
-    const { command, params } = message;
+    const { command, params, tabId } = message;
+    const targetTabId = tabId || youtubeState.selectedTabId;
+
+    // Check if Focus mode is active - block all YouTube controls
+    const isFocusActive = state.focusEndTime && Date.now() < state.focusEndTime;
+    if (isFocusActive) {
+        return { success: false, error: 'Focus mode đang bật. Tắt Focus mode để điều khiển YouTube.', focusBlocked: true };
+    }
+
+    if (!targetTabId) {
+        return { success: false, error: 'No YouTube tab selected' };
+    }
 
     try {
-        // Find YouTube tabs
-        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
-        if (tabs.length === 0) {
-            return { success: false, error: 'No YouTube tab found' };
+        // Verify tab exists
+        try {
+            await chrome.tabs.get(targetTabId);
+        } catch (e) {
+            return { success: false, error: 'Tab no longer exists' };
         }
 
-        const youtubeTab = tabs.find(t => t.active) || tabs[0];
-
         // Ensure content script is injected
-        const injectionResult = await ensureContentScriptInjected(youtubeTab.id);
+        const injectionResult = await ensureContentScriptInjected(targetTabId);
         if (!injectionResult.success) {
             return { success: false, error: injectionResult.error };
         }
 
         try {
-            const response = await chrome.tabs.sendMessage(youtubeTab.id, {
+            const response = await chrome.tabs.sendMessage(targetTabId, {
                 action: `youtube_${command}`,
                 ...params
             });
@@ -899,15 +955,105 @@ async function handleYoutubeControl(message) {
     }
 }
 
+// Get all YouTube tabs
+async function handleGetAllYoutubeTabs() {
+    try {
+        const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
+
+        if (tabs.length === 0) {
+            youtubeState.selectedTabId = null;
+            return { success: true, tabs: [], selectedTabId: null };
+        }
+
+        const tabsInfo = [];
+
+        for (const tab of tabs) {
+            // Ensure content script is injected
+            await ensureContentScriptInjected(tab.id);
+
+            try {
+                const response = await chrome.tabs.sendMessage(tab.id, { action: 'youtube_getState' });
+
+                tabsInfo.push({
+                    tabId: tab.id,
+                    title: response?.videoInfo?.title || tab.title || 'YouTube',
+                    isPlaying: response?.videoInfo?.isPlaying || false,
+                    isActive: tab.active
+                });
+
+                // Cache the full videoInfo
+                if (response?.videoInfo) {
+                    youtubeState.tabs[tab.id] = response.videoInfo;
+                }
+            } catch (e) {
+                // Content script not ready, use tab title
+                tabsInfo.push({
+                    tabId: tab.id,
+                    title: tab.title || 'YouTube',
+                    isPlaying: false,
+                    isActive: tab.active
+                });
+            }
+        }
+
+        // Auto-select first tab if none selected or selected tab closed
+        if (!youtubeState.selectedTabId || !tabs.find(t => t.id === youtubeState.selectedTabId)) {
+            youtubeState.selectedTabId = tabs[0].id;
+        }
+
+        return {
+            success: true,
+            tabs: tabsInfo,
+            selectedTabId: youtubeState.selectedTabId
+        };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// Select a YouTube tab for controls
+async function handleSelectYoutubeTab(tabId) {
+    try {
+        // Verify tab exists
+        const tab = await chrome.tabs.get(tabId);
+        if (tab) {
+            youtubeState.selectedTabId = tabId;
+            return { success: true, selectedTabId: tabId };
+        }
+        return { success: false, error: 'Tab not found' };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// Close a YouTube tab
+async function handleCloseYoutubeTab(tabId) {
+    try {
+        await chrome.tabs.remove(tabId);
+
+        // Clean up cached state
+        delete youtubeState.tabs[tabId];
+
+        // If closed tab was selected, reset selection
+        if (youtubeState.selectedTabId === tabId) {
+            youtubeState.selectedTabId = null;
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
 // Notify menubar app about YouTube state (fire and forget)
-async function notifyMenubarApp() {
-    if (!youtubeState.videoInfo) return;
+async function notifyMenubarApp(videoInfo) {
+    if (!videoInfo) return;
 
     try {
         await fetch(`http://localhost:${MENUBAR_HTTP_PORT}/youtube/state`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(youtubeState.videoInfo)
+            body: JSON.stringify(videoInfo)
         });
     } catch (e) {
         // Menubar app not running, ignore silently
