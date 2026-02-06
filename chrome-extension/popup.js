@@ -514,8 +514,10 @@ class PopupController {
                 this.youtubeTabsCount.textContent = tabsResponse.tabs.length;
             }
 
-            // Update selected tab ID
-            this.selectedYoutubeTabId = tabsResponse.selectedTabId;
+            // Auto-select first tab if none selected
+            if (!this.selectedYoutubeTabId || !tabsResponse.tabs.find(t => t.tabId === this.selectedYoutubeTabId)) {
+                this.selectedYoutubeTabId = tabsResponse.tabs[0].tabId;
+            }
 
             // Render tabs list
             this.renderYoutubeTabs(tabsResponse.tabs);
@@ -546,8 +548,10 @@ class PopupController {
     renderYoutubeTabs(tabs) {
         if (!this.youtubeTabsList) return;
 
-        this.youtubeTabsList.innerHTML = tabs.map(tab => `
-            <div class="youtube-tab-item ${tab.tabId === this.selectedYoutubeTabId ? 'selected' : ''}"
+        this.youtubeTabsList.innerHTML = tabs.map(tab => {
+            const isSelected = tab.tabId === this.selectedYoutubeTabId;
+            return `
+            <div class="youtube-tab-item ${isSelected ? 'selected' : ''}"
                  data-tab-id="${tab.tabId}">
                 <span class="youtube-tab-status">${tab.isPlaying ? '▶️' : '⏸️'}</span>
                 <span class="youtube-tab-title" title="${this.escapeHtml(tab.title)}">
@@ -555,7 +559,8 @@ class PopupController {
                 </span>
                 <button class="youtube-tab-close" data-tab-id="${tab.tabId}" title="Đóng tab">✕</button>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Add click listeners for selection
         this.youtubeTabsList.querySelectorAll('.youtube-tab-item').forEach(item => {
@@ -620,7 +625,7 @@ class PopupController {
             this.youtubeVolumeSlider.value = info.isMuted ? 0 : Math.round(info.volume * 100);
         }
 
-        // Update speed selector - find closest matching value
+        // Update speed selector
         if (this.youtubeSpeedSelect && info.playbackRate) {
             const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
             const closest = speeds.reduce((prev, curr) =>
@@ -656,6 +661,10 @@ class PopupController {
 
             if (response && response.success) {
                 this.showToast('Đã đóng tab YouTube');
+                // Reset selection if closed tab was selected
+                if (this.selectedYoutubeTabId === tabId) {
+                    this.selectedYoutubeTabId = null;
+                }
                 // Refresh display
                 await this.updateYoutubeDisplay();
             }

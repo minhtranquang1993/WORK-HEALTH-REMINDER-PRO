@@ -812,6 +812,7 @@ async function pauseAllYoutubeTabs() {
     try {
         const tabs = await chrome.tabs.query({ url: ['*://www.youtube.com/*', '*://youtube.com/*'] });
 
+
         for (const tab of tabs) {
             try {
                 // Ensure content script is injected
@@ -1059,6 +1060,32 @@ async function notifyMenubarApp(videoInfo) {
         // Menubar app not running, ignore silently
     }
 }
+
+// Clean up state when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+    // Clean up YouTube state
+    if (youtubeState.tabs[tabId]) {
+        delete youtubeState.tabs[tabId];
+    }
+    if (youtubeState.selectedTabId === tabId) {
+        youtubeState.selectedTabId = null;
+    }
+});
+
+// Clean up state when tabs navigate away from YouTube
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.url) {
+        const url = changeInfo.url;
+
+        // Check if navigated away from YouTube
+        if (youtubeState.tabs[tabId] && !url.includes('youtube.com')) {
+            delete youtubeState.tabs[tabId];
+            if (youtubeState.selectedTabId === tabId) {
+                youtubeState.selectedTabId = null;
+            }
+        }
+    }
+});
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(() => {

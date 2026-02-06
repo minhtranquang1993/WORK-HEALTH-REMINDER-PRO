@@ -1072,6 +1072,14 @@ input:focus, select:focus {
     color: #ff6b6b;
 }
 
+/* Platform indicator (YouTube or Facebook) */
+.youtube-tab-platform {
+    width: 18px;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+
 /* Playing indicator */
 .youtube-tab-status {
     width: 20px;
