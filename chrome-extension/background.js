@@ -90,7 +90,9 @@ const ALARMS = {
     STATUS_CHECK: 'status_check',
     POMODORO_CHECK: 'pomodoro_check',
     FOCUS_CHECK: 'focus_check',
-    DAILY_RESET: 'daily_reset'
+    DAILY_RESET: 'daily_reset',
+    TODO_REMINDER: 'todo_reminder',
+    TODO_START_REMINDER: 'todo_start_reminder'
 };
 
 // Reminder data
@@ -162,6 +164,14 @@ const REMINDERS = {
     focus_end: {
         title: "🎯 Focus Mode kết thúc!",
         message: "Đã hết thời gian tập trung. Nhắc nhở sẽ hoạt động lại!"
+    },
+    todo_incomplete: {
+        title: "📝 Đừng quên task hôm nay!",
+        message: "Bạn vẫn còn việc chưa hoàn thành. Cố lên nhé! 💪"
+    },
+    todo_start: {
+        title: "📝 Lên kế hoạch ngày mới!",
+        message: "Hãy thêm các đầu việc cần làm hôm nay vào Todo list nhé! ✨"
     }
 };
 
@@ -177,6 +187,28 @@ chrome.runtime.onInstalled.addListener(async () => {
 
     // Initialize state
     await chrome.storage.local.set({ state: state });
+
+    // Initialize todo storage if not exists
+    const todoData = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
+    if (!todoData.todoTasks) {
+        await chrome.storage.local.set({
+            todoTasks: { date: new Date().toDateString(), tasks: [] }
+        });
+    }
+    if (!todoData.todoHistory) {
+        await chrome.storage.local.set({ todoHistory: {} });
+    }
+    if (!todoData.todoSettings) {
+        await chrome.storage.local.set({
+            todoSettings: {
+                streak: 0,
+                bestStreak: 0,
+                lastCompletedDate: null,
+                autoReset: true,
+                reminderEnabled: true
+            }
+        });
+    }
 
     // Initialize timers
     await resetAllTimers();
@@ -223,7 +255,7 @@ async function setupAlarms() {
 }
 
 // Schedule fixed time alarms
-function scheduleFixedTimeAlarms(settings) {
+async function scheduleFixedTimeAlarms(settings) {
     const now = new Date();
     const today = now.toDateString();
 
@@ -261,6 +293,23 @@ function scheduleFixedTimeAlarms(settings) {
     morningTime.setHours(settings.morningReminderStart.hour, settings.morningReminderStart.minute, 0);
     if (morningTime > now && isWorkDay(settings)) {
         chrome.alarms.create(ALARMS.MORNING, { when: morningTime.getTime() });
+    }
+
+    // Todo Start Reminder (Work Start)
+    const workStartTime = new Date(today);
+    workStartTime.setHours(settings.workStart.hour, settings.workStart.minute, 0);
+    if (workStartTime > now && isWorkDay(settings)) {
+        chrome.alarms.create(ALARMS.TODO_START_REMINDER, { when: workStartTime.getTime() });
+    }
+
+    // Todo End Reminder (60 mins before work ends)
+    const todoTime = new Date(today);
+    const workEndTodo = getTodayWorkEnd(settings);
+    todoTime.setHours(workEndTodo.hour, workEndTodo.minute, 0);
+    todoTime.setMinutes(todoTime.getMinutes() - 60); // 60 mins before (around 16:30 for 17:30 end)
+
+    if (todoTime > now && isWorkDay(settings)) {
+        chrome.alarms.create(ALARMS.TODO_REMINDER, { when: todoTime.getTime() });
     }
 }
 
@@ -434,6 +483,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         state.workStartedToday = false;
         state.pomodoroCount = 0;
         await chrome.storage.local.set({ state });
+        await performTodoDailyReset(); // Reset todo daily
         scheduleFixedTimeAlarms(settings);
         return;
     }
@@ -486,6 +536,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         state.morningReminded = true;
         await chrome.storage.local.set({ state });
         showNotification('morning');
+        return;
+    }
+
+    if (alarm.name === ALARMS.TODO_START_REMINDER) {
+        await ensureTodoToday();
+        const { todoTasks } = await chrome.storage.local.get('todoTasks');
+        // Only show if no tasks added yet
+        if (!todoTasks || todoTasks.tasks.length === 0) {
+            showNotification('todo_start');
+        }
+        return;
+    }
+
+    if (alarm.name === ALARMS.TODO_REMINDER) {
+        const { todoTasks } = await chrome.storage.local.get('todoTasks');
+        if (todoTasks && todoTasks.tasks.some(t => !t.completed)) {
+            showNotification('todo_incomplete');
+        }
         return;
     }
 
@@ -742,6 +810,25 @@ async function handleMessage(message) {
         case 'closeYoutubeTab':
             return await handleCloseYoutubeTab(message.tabId);
 
+        // Todo handlers
+        case 'getTodoData':
+            await ensureTodoToday();
+            const todoData = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
+            return { success: true, ...todoData };
+
+        case 'addTodo':
+            return await handleTodoAddTask(message.task);
+
+        case 'toggleTodo':
+            return await handleTodoToggleTask(message.taskId);
+
+        case 'deleteTodo':
+            return await handleTodoDeleteTask(message.taskId);
+
+        case 'getTodoHistory':
+            const { todoHistory } = await chrome.storage.local.get('todoHistory');
+            return { success: true, history: todoHistory };
+
         default:
             return { success: false, error: 'Unknown action' };
     }
@@ -796,6 +883,194 @@ async function handleTogglePause() {
     }
 
     return { success: true, isPaused: settings.isPaused };
+}
+
+// ========================================
+// Todo Management
+// ========================================
+
+// Verify and ensure todo list is for today
+async function ensureTodoToday() {
+    const { todoTasks } = await chrome.storage.local.get('todoTasks');
+    const today = new Date().toDateString();
+
+    if (!todoTasks || todoTasks.date !== today) {
+        await performTodoDailyReset();
+    }
+}
+
+// Perform daily reset for Todo
+async function performTodoDailyReset() {
+    const { todoTasks, todoHistory, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
+    const today = new Date();
+    const todayDateStr = today.toDateString();
+
+    // If logic already ran for today, skip
+    if (todoTasks && todoTasks.date === todayDateStr) return;
+
+    // Save history
+    if (todoTasks && todoTasks.tasks.length > 0) {
+        const total = todoTasks.tasks.length;
+        const completed = todoTasks.tasks.filter(t => t.completed).length;
+        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        todoHistory[todoTasks.date] = { total, completed, percentage };
+    }
+
+    // Filter tasks to keep
+    let keptTasks = [];
+    if (todoTasks && todoTasks.tasks) {
+        keptTasks = todoTasks.tasks.filter(task => {
+            // Logic:
+            // 1. If not completed, ALWAYS keep (carry over)
+            if (!task.completed) return true;
+
+            // 2. If completed, check frequency
+            // 'once' -> Delete (don't keep)
+            if (!task.frequency || task.frequency === 'once') return false;
+
+            // 'daily', 'weekly', 'monthly' -> Keep
+            return true;
+        });
+
+        // Reset status for recurring tasks if needed
+        keptTasks = keptTasks.map(task => {
+            if (!task.completed) return task; // Keep incomplete as is
+
+            // For completed recurring tasks, check if we should reset 'completed' to false
+            let shouldReset = false;
+
+            if (task.frequency === 'daily') {
+                shouldReset = true;
+            } else if (task.frequency === 'weekly') {
+                // Reset on Monday (Day 1)
+                const day = today.getDay(); // 0-6
+                if (day === 1) shouldReset = true;
+            } else if (task.frequency === 'monthly') {
+                // Reset on 1st of month
+                if (today.getDate() === 1) shouldReset = true;
+            }
+
+            if (shouldReset) {
+                return { ...task, completed: false, completedAt: null };
+            }
+            return task; // Keep completed if not reset day
+        });
+    }
+
+    // Update tasks
+    const newTasks = {
+        date: todayDateStr,
+        tasks: keptTasks
+    };
+
+    // Keep history limited to 30 days
+    const dates = Object.keys(todoHistory).sort();
+    if (dates.length > 30) {
+        delete todoHistory[dates[0]];
+    }
+
+    await chrome.storage.local.set({
+        todoTasks: newTasks,
+        todoHistory
+    });
+}
+
+async function handleTodoAddTask(task) {
+    await ensureTodoToday();
+    const { todoTasks } = await chrome.storage.local.get('todoTasks');
+
+    const newTask = {
+        id: 't_' + Date.now(),
+        text: task.text,
+        priority: task.priority || 'medium', // high, medium, low
+        frequency: task.frequency || 'once', // once, daily, weekly, monthly
+        completed: false,
+        createdAt: Date.now(),
+        completedAt: null
+    };
+
+    todoTasks.tasks.unshift(newTask); // Add to top
+    await chrome.storage.local.set({ todoTasks });
+
+    return { success: true, task: newTask };
+}
+
+async function handleTodoToggleTask(taskId) {
+    await ensureTodoToday();
+    const { todoTasks, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoSettings']);
+
+    const taskIndex = todoTasks.tasks.findIndex(t => t.id === taskId);
+    if (taskIndex === -1) return { success: false, error: "Task not found" };
+
+    const task = todoTasks.tasks[taskIndex];
+    task.completed = !task.completed;
+    task.completedAt = task.completed ? Date.now() : null;
+
+    // Sort tasks: Incomplete first, then by priority, then by time
+    // But typically user wants list order stable or auto-sorted. 
+    // Let's keep array order but UI can sort. 
+    // Or we sort here? Let's just update data.
+
+    await chrome.storage.local.set({ todoTasks });
+
+    // Toggle Streak Update
+    await updateStreakStats(todoTasks, todoSettings);
+
+    return { success: true, task, todoSettings };
+}
+
+async function handleTodoDeleteTask(taskId) {
+    await ensureTodoToday();
+    const { todoTasks, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoSettings']);
+
+    todoTasks.tasks = todoTasks.tasks.filter(t => t.id !== taskId);
+    await chrome.storage.local.set({ todoTasks });
+
+    // Update streak in case deleting a task makes list 100%
+    await updateStreakStats(todoTasks, todoSettings);
+
+    return { success: true };
+}
+
+async function updateStreakStats(todoTasks, todoSettings) {
+    const total = todoTasks.tasks.length;
+    if (total === 0) return;
+
+    const completed = todoTasks.tasks.filter(t => t.completed).length;
+
+    // If all completed
+    if (completed === total && total > 0) {
+        const today = new Date().toDateString();
+        // If not already recorded as completed today
+        if (todoSettings.lastCompletedDate !== today) {
+            // Check if last completed was yesterday to increment streak
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toDateString();
+
+            if (todoSettings.lastCompletedDate === yesterdayStr) {
+                todoSettings.streak += 1;
+            } else {
+                todoSettings.streak = 1; // Start over (or 1 if just started today)
+            }
+
+            // Update best
+            if (todoSettings.streak > todoSettings.bestStreak) {
+                todoSettings.bestStreak = todoSettings.streak;
+            }
+
+            todoSettings.lastCompletedDate = today;
+            await chrome.storage.local.set({ todoSettings });
+        }
+    } else {
+        // If uncompleted a task and it was previously marked done today?
+        // It's complicated to "undo" streak. 
+        // For now, let's just stick to: Streak increases when you hit 100% for the first time that day.
+        // If you uncheck, we don't necessarily decrement immediately unless we track strict state.
+        // Simplicity: Streak calculation only strictly matters on Daily Reset or "Check" time.
+        // But user wants to see "Streak: 3".
+    }
 }
 
 // Reset all

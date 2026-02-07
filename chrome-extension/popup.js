@@ -8,6 +8,7 @@ class PopupController {
         this.initElements();
         this.initEventListeners();
         this.loadSettings();
+        this.loadTodoData();
         this.startUpdating();
     }
 
@@ -114,6 +115,21 @@ class PopupController {
 
         // Track selected YouTube tab
         this.selectedYoutubeTabId = null;
+
+        // Todo elements
+        this.todoInput = document.getElementById('todoInput');
+        this.todoPriority = document.getElementById('todoPriority');
+        this.btnTodoAdd = document.getElementById('btnTodoAdd');
+        this.todoList = document.getElementById('todoList');
+        this.todoEmptyState = document.getElementById('todoEmptyState');
+        this.todoProgressFill = document.getElementById('todoProgressFill');
+        this.todoPercentText = document.getElementById('todoPercentText');
+        this.todoCompletedCount = document.getElementById('todoCompletedCount');
+        this.todoTotalCount = document.getElementById('todoTotalCount');
+        this.todoStreakCount = document.getElementById('todoStreakCount');
+        this.btnToggleStats = document.getElementById('btnToggleStats');
+        this.todoStatsSection = document.getElementById('todoStatsSection');
+        this.statsChartContainer = document.getElementById('statsChartContainer');
     }
 
     initEventListeners() {
@@ -203,6 +219,19 @@ class PopupController {
                 }
             });
         }
+
+        // Todo events
+        if (this.btnTodoAdd) {
+            this.btnTodoAdd.addEventListener('click', () => this.addTodo());
+        }
+        if (this.todoInput) {
+            this.todoInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.addTodo();
+            });
+        }
+        if (this.btnToggleStats) {
+            this.btnToggleStats.addEventListener('click', () => this.toggleWeeklyStats());
+        }
     }
 
     switchTab(tabName) {
@@ -215,6 +244,10 @@ class PopupController {
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `tab-${tabName}`);
         });
+
+        if (tabName === 'todo') {
+            this.loadTodoData();
+        }
     }
 
     startUpdating() {
@@ -932,6 +965,225 @@ class PopupController {
         } catch (e) {
             console.log('Error resetting settings:', e);
         }
+    }
+
+
+    // ========================================
+    // Todo Methods
+    // ========================================
+
+    async loadTodoData() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getTodoData' });
+            if (response && response.success) {
+                this.renderTodoList(response.todoTasks.tasks);
+                this.updateTodoProgress(response.todoTasks.tasks);
+                this.updateTodoStreak(response.todoSettings);
+            }
+        } catch (e) {
+            console.log('Error loading todo data:', e);
+        }
+    }
+
+    async addTodo() {
+        if (!this.todoInput) return;
+        const text = this.todoInput.value.trim();
+        if (!text) return;
+
+        const priority = this.todoPriority.value;
+        const frequency = this.todoFrequency ? this.todoFrequency.value : 'once';
+
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'addTodo',
+                task: { text, priority, frequency }
+            });
+
+            if (response && response.success) {
+                this.todoInput.value = '';
+                this.loadTodoData(); // Reload to refresh list and order
+            }
+        } catch (e) {
+            console.log('Error adding todo:', e);
+        }
+    }
+
+    async toggleTodo(taskId) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'toggleTodo',
+                taskId: taskId
+            });
+
+            if (response && response.success) {
+                this.loadTodoData();
+            }
+        } catch (e) {
+            console.log('Error toggling todo:', e);
+        }
+    }
+
+    async deleteTodo(taskId) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'deleteTodo',
+                taskId: taskId
+            });
+
+            if (response && response.success) {
+                this.loadTodoData();
+            }
+        } catch (e) {
+            console.log('Error deleting todo:', e);
+        }
+    }
+
+    renderTodoList(tasks) {
+        if (!this.todoList) return;
+
+        if (!tasks || tasks.length === 0) {
+            this.todoList.innerHTML = '';
+            this.todoEmptyState.classList.remove('hidden');
+            return;
+        }
+
+        this.todoEmptyState.classList.add('hidden');
+
+        // Sort: Incomplete first, then by priority (High > Medium > Low), then by time
+        const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+
+        const sortedTasks = [...tasks].sort((a, b) => {
+            // 1. Completed last
+            if (a.completed !== b.completed) return a.completed ? 1 : -1;
+
+            // 2. Priority
+            if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+                return priorityOrder[a.priority] - priorityOrder[b.priority];
+            }
+
+            // 3. Time (Newest first)
+            return b.createdAt - a.createdAt;
+        });
+
+        const getFrequencyIcon = (freq) => {
+            switch (freq) {
+                case 'daily': return '<span title="Hàng ngày">🔄</span>';
+                case 'weekly': return '<span title="Hàng tuần">📅</span>';
+                case 'monthly': return '<span title="Hàng tháng">🗓️</span>';
+                default: return '';
+            }
+        };
+
+        this.todoList.innerHTML = sortedTasks.map(task => `
+            <div class="todo-item ${task.priority ? 'priority-' + task.priority : 'priority-medium'} ${task.completed ? 'completed' : ''}" data-id="${task.id}">
+                <div class="todo-checkbox"></div>
+                <div class="todo-content-wrapper" style="flex:1; display:flex; align-items:center;">
+                    <span class="todo-text">${this.escapeHtml(task.text)}</span>
+                    <span class="todo-freq-icon" style="margin-left:5px; font-size:0.8em;">${getFrequencyIcon(task.frequency)}</span>
+                </div>
+                <button class="todo-delete-btn" title="Xóa">✕</button>
+            </div>
+        `).join('');
+
+        // Add event listeners
+        this.todoList.querySelectorAll('.todo-item').forEach(item => {
+            const id = item.dataset.id;
+
+            // Toggle click (on item, but ignore delete btn)
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('todo-delete-btn')) return;
+                this.toggleTodo(id);
+            });
+
+            // Delete click
+            item.querySelector('.todo-delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('Bạn có chắc muốn xóa task này?')) {
+                    this.deleteTodo(id);
+                }
+            });
+        });
+    }
+
+    updateTodoProgress(tasks) {
+        if (!tasks) return;
+        const total = tasks.length;
+        const completed = tasks.filter(t => t.completed).length;
+
+        if (this.todoTotalCount) this.todoTotalCount.textContent = total;
+        if (this.todoCompletedCount) this.todoCompletedCount.textContent = completed;
+
+        let percent = 0;
+        if (total > 0) {
+            percent = Math.round((completed / total) * 100);
+        }
+
+        if (this.todoPercentText) this.todoPercentText.textContent = `${percent}%`;
+        if (this.todoProgressFill) this.todoProgressFill.style.width = `${percent}%`;
+    }
+
+    updateTodoStreak(settings) {
+        if (settings && settings.streak !== undefined && this.todoStreakCount) {
+            this.todoStreakCount.textContent = settings.streak;
+        }
+    }
+
+    toggleWeeklyStats() {
+        if (this.todoStatsSection.classList.contains('hidden')) {
+            this.todoStatsSection.classList.remove('hidden');
+            this.btnToggleStats.textContent = '🙈 Ẩn thống kê';
+            this.loadWeeklyStats();
+        } else {
+            this.todoStatsSection.classList.add('hidden');
+            this.btnToggleStats.textContent = '📊 Xem thống kê tuần';
+        }
+    }
+
+    async loadWeeklyStats() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getTodoHistory' });
+            if (response && response.success) {
+                this.renderWeeklyChart(response.history);
+            }
+        } catch (e) {
+            console.log('Error loading history:', e);
+        }
+    }
+
+    renderWeeklyChart(history) {
+        if (!this.statsChartContainer) return;
+
+        // Get last 7 days
+        const days = [];
+        const date = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(date.getDate() - i);
+            days.push(d.toDateString());
+        }
+
+        const chartHtml = days.map((dayStr, index) => {
+            const isToday = index === 6;
+            const data = history[dayStr] || { total: 0, completed: 0, percentage: 0 };
+            const height = data.percentage * 0.8; // Max height 80px (scaled by 0.8 to fit bar container)
+
+            // Simple day label (e.g. Mon, Tue)
+            // Use short day name in Vietnamese if possible, or simple date
+            // Let's use weekday number or short name
+            const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+            const dayLabel = weekdays[new Date(dayStr).getDay()];
+
+            return `
+                <div class="chart-column ${isToday ? 'today-column' : ''}">
+                    <div class="chart-bar-bg" title="${data.completed}/${data.total} (${data.percentage}%)">
+                        <div class="chart-bar-fill" style="height: ${data.percentage}%"></div>
+                    </div>
+                    <span class="chart-label">${dayLabel}</span>
+                </div>
+            `;
+        }).join('');
+
+        this.statsChartContainer.innerHTML = chartHtml;
     }
 }
 
