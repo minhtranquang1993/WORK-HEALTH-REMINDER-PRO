@@ -45,7 +45,6 @@
             <button class="tab-btn" data-tab="youtube">📺 YouTube</button>
             <button class="tab-btn" data-tab="focus">🎯 Focus</button>
             <button class="tab-btn" data-tab="todo">📝 Todo</button>
-            <button class="tab-btn" data-tab="exercise">💪 Tập</button>
             <button class="tab-btn" data-tab="settings">⚙️</button>
         </nav>
 
@@ -230,9 +229,12 @@
             </div>
         </section>
 
-        <!-- Tab: Exercise -->
-        <section class="tab-content" id="tab-exercise">
-            <h3 class="section-title">💪 Bài tập ngay</h3>
+        <!-- Exercise Panel (overlay) -->
+        <div class="exercise-panel hidden" id="exercisePanel">
+            <div class="exercise-panel-header">
+                <h3>💪 Bài tập nhanh</h3>
+                <button class="exercise-panel-close" id="btnCloseExercisePanel">✕</button>
+            </div>
             <div class="exercise-grid">
                 <button class="exercise-btn" data-exercise="neck">
                     <span class="ex-icon">🧘</span>
@@ -267,7 +269,7 @@
                     <span class="ex-label">Đứng dậy</span>
                 </button>
             </div>
-        </section>
+        </div>
 
         <!-- Tab: YouTube -->
         <section class="tab-content" id="tab-youtube">
@@ -460,6 +462,7 @@
         <!-- Footer -->
         <footer class="footer">
             <span>Work Health Reminder PRO v3.0</span>
+            <button class="exercise-quick-btn" id="btnExerciseQuick" title="Bài tập nhanh">💪</button>
         </footer>
     </div>
 

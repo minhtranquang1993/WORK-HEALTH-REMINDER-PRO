@@ -78,6 +78,11 @@ class PopupController {
         this.btnResetSettings = document.getElementById('btnResetSettings');
         this.btnTestTelegram = document.getElementById('btnTestTelegram');
 
+        // Exercise panel
+        this.exercisePanel = document.getElementById('exercisePanel');
+        this.btnExerciseQuick = document.getElementById('btnExerciseQuick');
+        this.btnCloseExercisePanel = document.getElementById('btnCloseExercisePanel');
+
         // Modal
         this.exerciseModal = document.getElementById('exerciseModal');
         this.modalTitle = document.getElementById('modalTitle');
@@ -165,6 +170,14 @@ class PopupController {
         // Pomodoro buttons
         this.btnStartPomodoro.addEventListener('click', () => this.startPomodoro());
         this.btnStopPomodoro.addEventListener('click', () => this.stopPomodoro());
+
+        // Exercise panel toggle
+        if (this.btnExerciseQuick) {
+            this.btnExerciseQuick.addEventListener('click', () => this.toggleExercisePanel());
+        }
+        if (this.btnCloseExercisePanel) {
+            this.btnCloseExercisePanel.addEventListener('click', () => this.closeExercisePanel());
+        }
 
         // Exercise buttons
         document.querySelectorAll('.exercise-btn').forEach(btn => {
@@ -519,10 +532,23 @@ class PopupController {
         }
     }
 
+    toggleExercisePanel() {
+        if (this.exercisePanel) {
+            this.exercisePanel.classList.toggle('hidden');
+        }
+    }
+
+    closeExercisePanel() {
+        if (this.exercisePanel) {
+            this.exercisePanel.classList.add('hidden');
+        }
+    }
+
     showExercise(exerciseType) {
         const exercise = EXERCISES[exerciseType];
         if (!exercise) return;
 
+        this.closeExercisePanel();
         this.modalTitle.textContent = exercise.title;
         this.modalContent.textContent = exercise.content;
         this.exerciseModal.classList.add('active');
