@@ -432,11 +432,28 @@
                 </div>
             </div>
 
+            <!-- Telegram Settings -->
+            <div class="settings-group">
+                <h3 class="section-title">📱 Telegram Integration</h3>
+                <div class="setting-row">
+                    <label>Bot Token:</label>
+                    <input type="password" id="settingTelegramToken" placeholder="Nhập Bot Token...">
+                </div>
+                <div class="setting-row">
+                    <label>Chat ID:</label>
+                    <input type="text" id="settingTelegramChatId" placeholder="Nhập Chat ID...">
+                </div>
+                <div class="setting-row">
+                    <label>Giờ báo cáo:</label>
+                    <input type="time" id="settingTelegramTime" value="17:00">
+                </div>
+            </div>
+
             <!-- Action Buttons -->
             <div class="settings-actions">
                 <button class="settings-btn save" id="btnSaveSettings">💾 Lưu cài đặt</button>
                 <button class="settings-btn reset" id="btnResetSettings">🔄 Đặt lại mặc định</button>
-                <button class="settings-btn test" id="btnTestNotification">📢 Test thông báo</button>
+                <button class="settings-btn test" id="btnTestTelegram">📢 Test thông báo</button>
             </div>
         </section>
 

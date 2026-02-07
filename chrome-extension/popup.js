@@ -63,6 +63,9 @@ class PopupController {
         this.settingSleepTime = document.getElementById('settingSleepTime');
         this.settingNightMode = document.getElementById('settingNightMode');
         this.settingNotification = document.getElementById('settingNotification');
+        this.settingTelegramToken = document.getElementById('settingTelegramToken');
+        this.settingTelegramChatId = document.getElementById('settingTelegramChatId');
+        this.settingTelegramTime = document.getElementById('settingTelegramTime');
 
         // Intervals
         this.intervalWalk = document.getElementById('intervalWalk');
@@ -73,7 +76,7 @@ class PopupController {
         // Settings buttons
         this.btnSaveSettings = document.getElementById('btnSaveSettings');
         this.btnResetSettings = document.getElementById('btnResetSettings');
-        this.btnTestNotification = document.getElementById('btnTestNotification');
+        this.btnTestTelegram = document.getElementById('btnTestTelegram');
 
         // Modal
         this.exerciseModal = document.getElementById('exerciseModal');
@@ -119,6 +122,7 @@ class PopupController {
         // Todo elements
         this.todoInput = document.getElementById('todoInput');
         this.todoPriority = document.getElementById('todoPriority');
+        this.todoFrequency = document.getElementById('todoFrequency');
         this.btnTodoAdd = document.getElementById('btnTodoAdd');
         this.todoList = document.getElementById('todoList');
         this.todoEmptyState = document.getElementById('todoEmptyState');
@@ -178,7 +182,7 @@ class PopupController {
         this.settingWeekendMode.addEventListener('change', () => this.updateWeekendModeUI());
         this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
-        this.btnTestNotification.addEventListener('click', () => this.testNotification());
+        this.btnTestTelegram.addEventListener('click', () => this.testTelegram());
 
         // YouTube controls
         if (this.btnOpenYoutube) {
@@ -491,12 +495,27 @@ class PopupController {
         }
     }
 
-    async testNotification() {
+    async testTelegram() {
+        // Save settings first to ensure background has latest tokens
+        await this.saveSettings();
+
         try {
-            await chrome.runtime.sendMessage({ action: 'testNotification' });
-            this.showToast('📢 Đã gửi thông báo test!');
+            this.btnTestTelegram.textContent = '⏳ Đang gửi...';
+            this.btnTestTelegram.disabled = true;
+
+            const response = await chrome.runtime.sendMessage({ action: 'testTelegram' });
+
+            if (response && response.success) {
+                this.showToast('✅ Đã gửi tin nhắn Telegram!');
+            } else {
+                this.showToast('❌ Lỗi: ' + (response.error || 'Unknown error'));
+            }
         } catch (e) {
-            console.log('Error testing notification:', e);
+            console.log('Error testing telegram:', e);
+            this.showToast('❌ Lỗi kết nối');
+        } finally {
+            this.btnTestTelegram.textContent = '📢 Test thông báo';
+            this.btnTestTelegram.disabled = false;
         }
     }
 
@@ -886,6 +905,11 @@ class PopupController {
                 // Notification
                 this.settingNotification.checked = s.notificationEnabled !== false;
 
+                // Telegram
+                this.settingTelegramToken.value = s.telegramBotToken || '8583787983:AAHlW0mGpe8erumz0peN1gtXU2X7BtK2Zes';
+                this.settingTelegramChatId.value = s.telegramChatId || '1661694132';
+                this.settingTelegramTime.value = this.formatTimeValue(s.telegramReportTime || { hour: 17, minute: 0 });
+
                 // Intervals
                 if (s.intervals) {
                     this.intervalWalk.value = s.intervals.walk || 30;
@@ -935,6 +959,9 @@ class PopupController {
                 sleepReminderTime: this.parseTimeValue(this.settingSleepTime.value),
                 nightModeStart: this.parseTimeValue(this.settingNightMode.value),
                 notificationEnabled: this.settingNotification.checked,
+                telegramBotToken: this.settingTelegramToken.value.trim(),
+                telegramChatId: this.settingTelegramChatId.value.trim(),
+                telegramReportTime: this.parseTimeValue(this.settingTelegramTime.value),
                 intervals: {
                     walk: parseInt(this.intervalWalk.value) || 30,
                     water: parseInt(this.intervalWater.value) || 45,
@@ -1023,7 +1050,13 @@ class PopupController {
         }
     }
 
-    async deleteTodo(taskId) {
+    async deleteTodo(taskId, element) {
+        if (element) {
+            element.classList.add('sliding-out');
+            // Wait for animation
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
         try {
             const response = await chrome.runtime.sendMessage({
                 action: 'deleteTodo',
@@ -1047,12 +1080,22 @@ class PopupController {
             return;
         }
 
+        // Separate active vs scheduled (not due today)
+        const activeTasks = tasks.filter(t => t.isActiveToday !== false);
+        const scheduledTasks = tasks.filter(t => t.isActiveToday === false);
+
+        if (activeTasks.length === 0 && scheduledTasks.length === 0) {
+            this.todoList.innerHTML = '';
+            this.todoEmptyState.classList.remove('hidden');
+            return;
+        }
+
         this.todoEmptyState.classList.add('hidden');
 
         // Sort: Incomplete first, then by priority (High > Medium > Low), then by time
         const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
 
-        const sortedTasks = [...tasks].sort((a, b) => {
+        const sortedTasks = [...activeTasks].sort((a, b) => {
             // 1. Completed last
             if (a.completed !== b.completed) return a.completed ? 1 : -1;
 
@@ -1065,41 +1108,100 @@ class PopupController {
             return b.createdAt - a.createdAt;
         });
 
-        const getFrequencyIcon = (freq) => {
+        const getFrequencyLabel = (freq) => {
             switch (freq) {
-                case 'daily': return '<span title="Hàng ngày">🔄</span>';
-                case 'weekly': return '<span title="Hàng tuần">📅</span>';
-                case 'monthly': return '<span title="Hàng tháng">🗓️</span>';
+                case 'daily': return 'Hàng ngày';
+                case 'weekly': return 'Hàng tuần';
+                case 'monthly': return 'Hàng tháng';
+                default: return null;
+            }
+        };
+
+        const getPriorityLabel = (prio) => {
+            switch (prio) {
+                case 'high': return 'Cao';
+                case 'medium': return 'TB';
+                case 'low': return 'Thấp';
                 default: return '';
             }
         };
 
-        this.todoList.innerHTML = sortedTasks.map(task => `
-            <div class="todo-item ${task.priority ? 'priority-' + task.priority : 'priority-medium'} ${task.completed ? 'completed' : ''}" data-id="${task.id}">
-                <div class="todo-checkbox"></div>
-                <div class="todo-content-wrapper" style="flex:1; display:flex; align-items:center;">
-                    <span class="todo-text">${this.escapeHtml(task.text)}</span>
-                    <span class="todo-freq-icon" style="margin-left:5px; font-size:0.8em;">${getFrequencyIcon(task.frequency)}</span>
+        const getFreqDueLabel = (freq) => {
+            if (freq === 'weekly') return 'T2';
+            if (freq === 'monthly') return 'Mùng 1';
+            return '';
+        };
+
+        // Render active tasks
+        let html = sortedTasks.map(task => {
+            const freqLabel = getFrequencyLabel(task.frequency);
+
+            return `
+            <div class="todo-item ${task.priority ? 'priority-' + task.priority : 'priority-medium'} ${task.completed ? 'is-completed' : ''}" data-id="${task.id}">
+                <div class="todo-checkbox-wrapper">
+                    <input type="checkbox" class="todo-checkbox" ${task.completed ? 'checked' : ''}>
                 </div>
-                <button class="todo-delete-btn" title="Xóa">✕</button>
+                <div class="todo-content">
+                    <span class="todo-text">${this.escapeHtml(task.text)}</span>
+                    <div class="todo-meta">
+                        ${freqLabel ? `<span class="todo-tag">🔄 ${freqLabel}</span>` : ''}
+                    </div>
+                </div>
+                <button class="todo-delete-btn" title="Xóa">🗑️</button>
             </div>
-        `).join('');
+        `}).join('');
+
+        // Render scheduled (not due today) section
+        if (scheduledTasks.length > 0) {
+            html += `<div class="todo-scheduled-header">📅 Chưa đến hạn</div>`;
+            html += scheduledTasks.map(task => {
+                const dueLabel = getFreqDueLabel(task.frequency);
+                return `
+                <div class="todo-item todo-scheduled ${task.completed ? 'is-completed' : ''}" data-id="${task.id}">
+                    <div class="todo-checkbox-wrapper">
+                        <input type="checkbox" class="todo-checkbox" ${task.completed ? 'checked' : ''} disabled>
+                    </div>
+                    <div class="todo-content">
+                        <span class="todo-text">${this.escapeHtml(task.text)}</span>
+                        <div class="todo-meta">
+                            <span class="todo-tag">📅 ${dueLabel}</span>
+                        </div>
+                    </div>
+                    <button class="todo-delete-btn" title="Xóa">🗑️</button>
+                </div>
+            `}).join('');
+        }
+
+        this.todoList.innerHTML = html;
 
         // Add event listeners
         this.todoList.querySelectorAll('.todo-item').forEach(item => {
             const id = item.dataset.id;
+            const checkbox = item.querySelector('.todo-checkbox');
+            const deleteBtn = item.querySelector('.todo-delete-btn');
+            const isScheduled = item.classList.contains('todo-scheduled');
 
-            // Toggle click (on item, but ignore delete btn)
-            item.addEventListener('click', (e) => {
-                if (e.target.classList.contains('todo-delete-btn')) return;
-                this.toggleTodo(id);
-            });
+            if (!isScheduled) {
+                // Active tasks: click to toggle
+                item.addEventListener('click', (e) => {
+                    if (e.target === deleteBtn || deleteBtn.contains(e.target) || e.target === checkbox) return;
+                    item.classList.toggle('is-completed');
+                    checkbox.checked = !checkbox.checked;
+                    this.toggleTodo(id);
+                });
 
-            // Delete click
-            item.querySelector('.todo-delete-btn').addEventListener('click', (e) => {
+                checkbox.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    item.classList.toggle('is-completed');
+                    this.toggleTodo(id);
+                });
+            }
+
+            // Delete click (both active and scheduled)
+            deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (confirm('Bạn có chắc muốn xóa task này?')) {
-                    this.deleteTodo(id);
+                    this.deleteTodo(id, item);
                 }
             });
         });
@@ -1107,8 +1209,10 @@ class PopupController {
 
     updateTodoProgress(tasks) {
         if (!tasks) return;
-        const total = tasks.length;
-        const completed = tasks.filter(t => t.completed).length;
+        // Only count tasks active today (weekly/monthly excluded on off days)
+        const activeTasks = tasks.filter(t => t.isActiveToday !== false);
+        const total = activeTasks.length;
+        const completed = activeTasks.filter(t => t.completed).length;
 
         if (this.todoTotalCount) this.todoTotalCount.textContent = total;
         if (this.todoCompletedCount) this.todoCompletedCount.textContent = completed;

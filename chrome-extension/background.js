@@ -19,6 +19,11 @@ const DEFAULT_SETTINGS = {
     saturdayEnd: { hour: 12, minute: 0 },
     sundayEnd: { hour: 12, minute: 0 },
 
+    // Telegram
+    telegramBotToken: "8583787983:AAHlW0mGpe8erumz0peN1gtXU2X7BtK2Zes",
+    telegramChatId: "1661694132",
+    telegramReportTime: { hour: 17, minute: 0 },
+
     // Pomodoro settings
     pomodoroWork: 25,
     pomodoroBreak: 5,
@@ -92,7 +97,8 @@ const ALARMS = {
     FOCUS_CHECK: 'focus_check',
     DAILY_RESET: 'daily_reset',
     TODO_REMINDER: 'todo_reminder',
-    TODO_START_REMINDER: 'todo_start_reminder'
+    TODO_START_REMINDER: 'todo_start_reminder',
+    DAILY_REPORT: 'daily_report'
 };
 
 // Reminder data
@@ -311,6 +317,19 @@ async function scheduleFixedTimeAlarms(settings) {
     if (todoTime > now && isWorkDay(settings)) {
         chrome.alarms.create(ALARMS.TODO_REMINDER, { when: todoTime.getTime() });
     }
+
+    // Daily Telegram Report
+    if (settings.telegramBotToken && settings.telegramChatId) {
+        const reportTime = new Date(today);
+        reportTime.setHours(settings.telegramReportTime.hour, settings.telegramReportTime.minute, 0);
+
+        // If time passed, schedule for tomorrow? No, just skip for today to avoid spam if reloading.
+        // But if user just set it, maybe they want it? 
+        // Let's stick to: if future, schedule.
+        if (reportTime > now) {
+            chrome.alarms.create(ALARMS.DAILY_REPORT, { when: reportTime.getTime() });
+        }
+    }
 }
 
 // Check if today is a work day
@@ -330,6 +349,28 @@ function isWorkDay(settings) {
         default:
             return dayOfWeek < 5;
     }
+}
+
+// Check if a task should be active today (for weekly/monthly tasks)
+// Weekly tasks only active on Monday (T2), monthly only on 1st (Mùng 1)
+function isTaskActiveToday(task) {
+    if (!task.frequency || task.frequency === 'once' || task.frequency === 'daily') {
+        return true;
+    }
+
+    const today = new Date();
+
+    if (task.frequency === 'weekly') {
+        // Only active on Monday (getDay() === 1 = Monday)
+        return today.getDay() === 1;
+    }
+
+    if (task.frequency === 'monthly') {
+        // Only active on 1st of month
+        return today.getDate() === 1;
+    }
+
+    return true;
 }
 
 // Check if today is a half day (Saturday or Sunday)
@@ -551,7 +592,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
     if (alarm.name === ALARMS.TODO_REMINDER) {
         const { todoTasks } = await chrome.storage.local.get('todoTasks');
-        if (todoTasks && todoTasks.tasks.some(t => !t.completed)) {
+        if (todoTasks && todoTasks.tasks.some(t => !t.completed && isTaskActiveToday(t))) {
             showNotification('todo_incomplete');
         }
         return;
@@ -581,6 +622,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const reminderType = reminderMap[alarm.name];
     if (reminderType) {
         showNotification(reminderType);
+    }
+});
+
+// Handle Daily Report Alarm
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === ALARMS.DAILY_REPORT) {
+        await sendTelegramReport();
     }
 });
 
@@ -752,6 +800,9 @@ async function handleMessage(message) {
             showNotification('walk');
             return { success: true };
 
+        case 'testTelegram':
+            return await sendTelegramReport(true);
+
         case 'startFocus':
             state.focusEndTime = Date.now() + message.minutes * 60 * 1000;
             await chrome.storage.local.set({ state });
@@ -814,6 +865,13 @@ async function handleMessage(message) {
         case 'getTodoData':
             await ensureTodoToday();
             const todoData = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
+            // Tag each task with isActiveToday so popup can filter/display correctly
+            if (todoData.todoTasks && todoData.todoTasks.tasks) {
+                todoData.todoTasks.tasks = todoData.todoTasks.tasks.map(task => ({
+                    ...task,
+                    isActiveToday: isTaskActiveToday(task)
+                }));
+            }
             return { success: true, ...todoData };
 
         case 'addTodo':
@@ -1366,3 +1424,117 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.runtime.onStartup.addListener(() => {
     setupAlarms();
 });
+
+// ========================================
+// Telegram Integration
+// ========================================
+
+async function sendTelegramReport(isTest = false) {
+    const { settings } = await chrome.storage.local.get('settings');
+
+    if (!settings || !settings.telegramBotToken || !settings.telegramChatId) {
+        return { success: false, error: 'Chưa cấu hình Telegram' };
+    }
+
+    // Get Todo Data
+    await ensureTodoToday();
+    const { todoTasks } = await chrome.storage.local.get('todoTasks');
+    const allTasks = todoTasks ? todoTasks.tasks : [];
+
+    // Separate active vs scheduled (not due today) tasks
+    const activeTasks = allTasks.filter(t => isTaskActiveToday(t));
+    const scheduledTasks = allTasks.filter(t => !isTaskActiveToday(t));
+
+    const total = activeTasks.length;
+    const completed = activeTasks.filter(t => t.completed).length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    const completedTasks = activeTasks.filter(t => t.completed);
+    const pendingTasks = activeTasks.filter(t => !t.completed);
+
+    // Escape HTML entities in user text
+    const esc = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const getFreqDueLabel = (freq) => {
+        if (freq === 'weekly') return '(T2)';
+        if (freq === 'monthly') return '(Mùng 1)';
+        return '';
+    };
+
+    // Format Date
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('vi-VN', {
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit'
+    });
+
+    let message = `📅 <b>BÁO CÁO NGÀY ${esc(dateStr.toUpperCase())}</b>\n`;
+    message += `------------------------------\n`;
+    message += `📊 Tiến độ: ${percent}% (${completed}/${total})\n\n`;
+
+    if (completedTasks.length > 0) {
+        message += `✅ <b>Đã hoàn thành:</b>\n`;
+        completedTasks.forEach(t => {
+            message += `✓ ${esc(t.text)}\n`;
+        });
+        message += `\n`;
+    }
+
+    if (pendingTasks.length > 0) {
+        message += `⏳ <b>Chưa hoàn thành:</b>\n`;
+        pendingTasks.forEach(t => {
+            message += `○ ${esc(t.text)}\n`;
+        });
+        message += `\n`;
+    } else if (total > 0) {
+        message += `🎉 Xuất sắc! Bạn đã hoàn thành tất cả công việc!\n\n`;
+    }
+
+    if (total === 0 && scheduledTasks.length === 0) {
+        message += `📝 Hôm nay chưa có task nào được tạo.\n`;
+    }
+
+    // Show scheduled tasks (weekly/monthly not due today)
+    if (scheduledTasks.length > 0) {
+        message += `📅 <b>Chưa đến hạn:</b>\n`;
+        scheduledTasks.forEach(t => {
+            const dueLabel = getFreqDueLabel(t.frequency);
+            const status = t.completed ? '✓' : '○';
+            message += `${status} ${esc(t.text)} ${dueLabel}\n`;
+        });
+        message += `\n`;
+    }
+
+    if (isTest) {
+        message = `⚠️ <b>TEST NOTIFICATION</b>\n\n` + message;
+    }
+
+    // Send to Telegram
+    try {
+        const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                chat_id: settings.telegramChatId,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.ok) {
+            return { success: true };
+        } else {
+            console.error('Telegram API Error:', data);
+            return { success: false, error: data.description };
+        }
+    } catch (e) {
+        console.error('Network Error:', e);
+        return { success: false, error: e.message };
+    }
+}
