@@ -60,6 +60,9 @@ class PopupController {
         this.settingWeekendMode = document.getElementById('settingWeekendMode');
         this.settingSaturdayEnd = document.getElementById('settingSaturdayEnd');
         this.settingSundayEnd = document.getElementById('settingSundayEnd');
+        this.settingWorkPeriodEnabled = document.getElementById('settingWorkPeriodEnabled');
+        this.settingWorkPeriodStart = document.getElementById('settingWorkPeriodStart');
+        this.settingWorkPeriodEnd = document.getElementById('settingWorkPeriodEnd');
         this.settingSleepTime = document.getElementById('settingSleepTime');
         this.settingNightMode = document.getElementById('settingNightMode');
         this.settingNotification = document.getElementById('settingNotification');
@@ -193,6 +196,7 @@ class PopupController {
 
         // Settings
         this.settingWeekendMode.addEventListener('change', () => this.updateWeekendModeUI());
+        this.settingWorkPeriodEnabled.addEventListener('change', () => this.updateWorkPeriodUI());
         this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
         this.btnTestTelegram.addEventListener('click', () => this.testTelegram());
@@ -924,6 +928,12 @@ class PopupController {
                 this.settingSaturdayEnd.value = this.formatTimeValue(s.saturdayEnd);
                 this.settingSundayEnd.value = this.formatTimeValue(s.sundayEnd);
 
+                // Work period
+                this.settingWorkPeriodEnabled.checked = s.workPeriodEnabled || false;
+                this.settingWorkPeriodStart.value = s.workPeriodStart || '';
+                this.settingWorkPeriodEnd.value = s.workPeriodEnd || '';
+                this.updateWorkPeriodUI();
+
                 // Special reminders
                 this.settingSleepTime.value = this.formatTimeValue(s.sleepReminderTime);
                 this.settingNightMode.value = this.formatTimeValue(s.nightModeStart);
@@ -972,6 +982,12 @@ class PopupController {
         sunRow.classList.toggle('hidden', mode !== 'mon_sun_half');
     }
 
+    updateWorkPeriodUI() {
+        const enabled = this.settingWorkPeriodEnabled.checked;
+        document.getElementById('workPeriodStartRow').classList.toggle('hidden', !enabled);
+        document.getElementById('workPeriodEndRow').classList.toggle('hidden', !enabled);
+    }
+
     async saveSettings() {
         try {
             const settings = {
@@ -982,6 +998,9 @@ class PopupController {
                 weekendMode: this.settingWeekendMode.value,
                 saturdayEnd: this.parseTimeValue(this.settingSaturdayEnd.value),
                 sundayEnd: this.parseTimeValue(this.settingSundayEnd.value),
+                workPeriodEnabled: this.settingWorkPeriodEnabled.checked,
+                workPeriodStart: this.settingWorkPeriodStart.value || '',
+                workPeriodEnd: this.settingWorkPeriodEnd.value || '',
                 sleepReminderTime: this.parseTimeValue(this.settingSleepTime.value),
                 nightModeStart: this.parseTimeValue(this.settingNightMode.value),
                 notificationEnabled: this.settingNotification.checked,

@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS = {
     weekendMode: "mon_fri", // mon_fri, mon_sat_full, mon_sat_half, mon_sun_full, mon_sun_half
     saturdayEnd: { hour: 12, minute: 0 },
     sundayEnd: { hour: 12, minute: 0 },
+    workPeriodEnabled: false,
+    workPeriodStart: "",  // "YYYY-MM-DD" format
+    workPeriodEnd: "",    // "YYYY-MM-DD" format
 
     // Telegram
     telegramBotToken: "8583787983:AAHlW0mGpe8erumz0peN1gtXU2X7BtK2Zes",
@@ -332,8 +335,31 @@ async function scheduleFixedTimeAlarms(settings) {
     }
 }
 
+// Check if today is within work period date range
+function isWithinWorkPeriod(settings) {
+    if (!settings.workPeriodEnabled) return true; // Not enabled = always valid
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (settings.workPeriodStart) {
+        const startDate = new Date(settings.workPeriodStart + 'T00:00:00');
+        if (today < startDate) return false;
+    }
+
+    if (settings.workPeriodEnd) {
+        const endDate = new Date(settings.workPeriodEnd + 'T00:00:00');
+        if (today > endDate) return false;
+    }
+
+    return true;
+}
+
 // Check if today is a work day
 function isWorkDay(settings) {
+    // Check work period date range first
+    if (!isWithinWorkPeriod(settings)) return false;
+
     const today = new Date().getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const dayOfWeek = today === 0 ? 6 : today - 1; // Convert to Monday=0, Sunday=6
 
