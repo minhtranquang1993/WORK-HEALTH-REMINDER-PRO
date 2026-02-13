@@ -9,6 +9,7 @@ class PopupController {
         this.initEventListeners();
         this.loadSettings();
         this.loadTodoData();
+        this.loadHolidays();
         this.startUpdating();
     }
 
@@ -253,6 +254,12 @@ class PopupController {
         if (this.btnToggleStats) {
             this.btnToggleStats.addEventListener('click', () => this.toggleWeeklyStats());
         }
+
+        // Holiday events
+        const btnAddCustomHoliday = document.getElementById('btnAddCustomHoliday');
+        if (btnAddCustomHoliday) {
+            btnAddCustomHoliday.addEventListener('click', () => this.addCustomHoliday());
+        }
     }
 
     switchTab(tabName) {
@@ -268,6 +275,9 @@ class PopupController {
 
         if (tabName === 'todo') {
             this.loadTodoData();
+        }
+        if (tabName === 'settings') {
+            this.loadHolidays();
         }
     }
 
@@ -330,6 +340,8 @@ class PopupController {
             this.statusBadge.classList.add('lunch');
         } else if (workStatus.status === 'ended' || workStatus.status === 'before' || workStatus.status === 'weekend') {
             this.statusBadge.classList.add('ended');
+        } else if (workStatus.status === 'holiday') {
+            this.statusBadge.classList.add('holiday');
         } else if (workStatus.status === 'focus') {
             this.statusBadge.classList.add('focus');
         } else if (workStatus.status.startsWith('pomodoro')) {
@@ -905,6 +917,140 @@ class PopupController {
             }
         } catch (e) {
             console.log('Error seeking:', e);
+        }
+    }
+
+    // ========================================
+    // Holidays
+    // ========================================
+    async loadHolidays() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getHolidays' });
+            if (response && response.success) {
+                this.renderFixedHolidays(response.fixedHolidays);
+                this.renderCustomHolidays(response.customHolidays);
+            }
+        } catch (e) {
+            console.log('Error loading holidays:', e);
+        }
+    }
+
+    renderFixedHolidays(holidays) {
+        const container = document.getElementById('fixedHolidayList');
+        if (!container) return;
+
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        container.innerHTML = holidays.map(h => {
+            const isActive = todayStr >= h.start && todayStr <= h.end;
+            const isPast = todayStr > h.end;
+            const isUpcoming = !isActive && !isPast;
+            const statusClass = isActive ? 'active' : (isPast ? 'past' : '');
+
+            let badge = '';
+            if (isActive) badge = '<span class="holiday-badge now">Đang nghỉ</span>';
+            else if (isUpcoming) badge = '<span class="holiday-badge upcoming">Sắp tới</span>';
+
+            const dateDisplay = h.start === h.end
+                ? this.formatHolidayDate(h.start)
+                : `${this.formatHolidayDate(h.start)} → ${this.formatHolidayDate(h.end)}`;
+
+            return `
+                <div class="holiday-item ${statusClass}">
+                    <span class="holiday-name">🎌 ${h.name}</span>
+                    <span class="holiday-date">${dateDisplay}</span>
+                    ${badge}
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderCustomHolidays(holidays) {
+        const container = document.getElementById('customHolidayList');
+        if (!container) return;
+
+        if (!holidays || holidays.length === 0) {
+            container.innerHTML = '<div class="custom-holiday-empty">Chưa có ngày nghỉ tùy chỉnh</div>';
+            return;
+        }
+
+        container.innerHTML = holidays.map((h, i) => {
+            const dateDisplay = h.start === h.end
+                ? this.formatHolidayDate(h.start)
+                : `${this.formatHolidayDate(h.start)} → ${this.formatHolidayDate(h.end)}`;
+
+            return `
+                <div class="custom-holiday-item">
+                    <div class="holiday-info">
+                        <span class="holiday-name">📌 ${this.escapeHtml(h.name)}</span>
+                        <span class="holiday-date">${dateDisplay}</span>
+                    </div>
+                    <button class="custom-holiday-delete" data-index="${i}" title="Xóa">✕</button>
+                </div>
+            `;
+        }).join('');
+
+        // Add delete listeners
+        container.querySelectorAll('.custom-holiday-delete').forEach(btn => {
+            btn.addEventListener('click', () => this.removeCustomHoliday(parseInt(btn.dataset.index)));
+        });
+    }
+
+    formatHolidayDate(dateStr) {
+        const [y, m, d] = dateStr.split('-');
+        return `${d}/${m}`;
+    }
+
+    async addCustomHoliday() {
+        const name = document.getElementById('customHolidayName').value.trim();
+        const start = document.getElementById('customHolidayStart').value;
+        const end = document.getElementById('customHolidayEnd').value || start;
+
+        if (!name || !start) {
+            this.showToast('⚠️ Vui lòng nhập tên và ngày');
+            return;
+        }
+
+        if (end < start) {
+            this.showToast('⚠️ Ngày kết thúc phải sau ngày bắt đầu');
+            return;
+        }
+
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'addCustomHoliday',
+                name, start, end
+            });
+
+            if (response && response.success) {
+                this.renderCustomHolidays(response.customHolidays);
+                // Clear form
+                document.getElementById('customHolidayName').value = '';
+                document.getElementById('customHolidayStart').value = '';
+                document.getElementById('customHolidayEnd').value = '';
+                this.showToast('✅ Đã thêm ngày nghỉ');
+            }
+        } catch (e) {
+            console.log('Error adding custom holiday:', e);
+            this.showToast('❌ Lỗi thêm ngày nghỉ');
+        }
+    }
+
+    async removeCustomHoliday(index) {
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'removeCustomHoliday',
+                index
+            });
+
+            if (response && response.success) {
+                this.renderCustomHolidays(response.customHolidays);
+                this.showToast('🗑️ Đã xóa ngày nghỉ');
+            }
+        } catch (e) {
+            console.log('Error removing custom holiday:', e);
+            this.showToast('❌ Lỗi xóa ngày nghỉ');
         }
     }
 

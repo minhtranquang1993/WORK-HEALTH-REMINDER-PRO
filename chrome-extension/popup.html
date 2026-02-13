@@ -401,6 +401,39 @@
                 </div>
             </div>
 
+            <!-- Holidays -->
+            <div class="settings-group">
+                <h3 class="section-title">🎌 Ngày nghỉ lễ</h3>
+
+                <!-- Fixed holidays list -->
+                <div class="holiday-list" id="fixedHolidayList">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Custom holidays -->
+                <div class="custom-holiday-section">
+                    <h4 class="subsection-title">📌 Ngày nghỉ tùy chỉnh</h4>
+                    <div class="custom-holiday-form" id="customHolidayForm">
+                        <div class="setting-row">
+                            <label>Tên:</label>
+                            <input type="text" id="customHolidayName" placeholder="VD: Nghỉ bù 30/4">
+                        </div>
+                        <div class="setting-row">
+                            <label>Từ ngày:</label>
+                            <input type="date" id="customHolidayStart">
+                        </div>
+                        <div class="setting-row">
+                            <label>Đến ngày:</label>
+                            <input type="date" id="customHolidayEnd">
+                        </div>
+                        <button class="holiday-add-btn" id="btnAddCustomHoliday">+ Thêm ngày nghỉ</button>
+                    </div>
+                    <div class="custom-holiday-list" id="customHolidayList">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Special Reminders -->
             <div class="settings-group">
                 <h3 class="section-title">🌙 Nhắc nhở đặc biệt</h3>

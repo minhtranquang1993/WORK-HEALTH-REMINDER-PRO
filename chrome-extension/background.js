@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
     weekendMode: "mon_fri", // mon_fri, mon_sat_full, mon_sat_half, mon_sun_full, mon_sun_half
     saturdayEnd: { hour: 12, minute: 0 },
     sundayEnd: { hour: 12, minute: 0 },
+    customHolidays: [], // User-added holidays: [{ name, start, end }]
     workPeriodEnabled: false,
     workPeriodStart: "",  // "YYYY-MM-DD" format
     workPeriodEnd: "",    // "YYYY-MM-DD" format
@@ -78,6 +79,16 @@ let youtubeState = {
 
 // Menubar app HTTP port
 const MENUBAR_HTTP_PORT = 9876;
+
+// Vietnamese holidays 2026 (fixed)
+const HOLIDAYS_2026 = [
+    { name: "Tết Dương lịch", start: "2026-01-01", end: "2026-01-01" },
+    { name: "Tết Nguyên đán", start: "2026-02-15", end: "2026-02-22" },
+    { name: "Giỗ Tổ Hùng Vương", start: "2026-04-26", end: "2026-04-26" },
+    { name: "Ngày Giải phóng miền Nam", start: "2026-04-30", end: "2026-04-30" },
+    { name: "Quốc tế Lao động", start: "2026-05-01", end: "2026-05-01" },
+    { name: "Quốc khánh", start: "2026-09-02", end: "2026-09-02" }
+];
 
 // Alarm names
 const ALARMS = {
@@ -355,9 +366,36 @@ function isWithinWorkPeriod(settings) {
     return true;
 }
 
+// Check if a date is a holiday (returns { isHoliday: bool, name: string })
+function checkHoliday(settings, date) {
+    const d = date || new Date();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    // Check fixed holidays
+    for (const h of HOLIDAYS_2026) {
+        if (dateStr >= h.start && dateStr <= h.end) {
+            return { isHoliday: true, name: h.name };
+        }
+    }
+
+    // Check custom holidays
+    const customHolidays = settings.customHolidays || [];
+    for (const h of customHolidays) {
+        if (dateStr >= h.start && dateStr <= h.end) {
+            return { isHoliday: true, name: h.name };
+        }
+    }
+
+    return { isHoliday: false, name: null };
+}
+
 // Check if today is a work day
 function isWorkDay(settings) {
-    // Check work period date range first
+    // Check holidays first
+    const holiday = checkHoliday(settings);
+    if (holiday.isHoliday) return false;
+
+    // Check work period date range
     if (!isWithinWorkPeriod(settings)) return false;
 
     const today = new Date().getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -507,6 +545,10 @@ function getWorkStatus(settings) {
     }
 
     if (!isWorkDay(settings)) {
+        const holiday = checkHoliday(settings);
+        if (holiday.isHoliday) {
+            return { status: 'holiday', label: `🎌 ${holiday.name}`, color: 'red' };
+        }
         const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
         const today = days[new Date().getDay()];
         return { status: 'weekend', label: `🎉 Ngày nghỉ (${today})`, color: 'purple' };
@@ -912,6 +954,33 @@ async function handleMessage(message) {
         case 'getTodoHistory':
             const { todoHistory } = await chrome.storage.local.get('todoHistory');
             return { success: true, history: todoHistory };
+
+        // Holiday handlers
+        case 'getHolidays':
+            return {
+                success: true,
+                fixedHolidays: HOLIDAYS_2026,
+                customHolidays: settings.customHolidays || []
+            };
+
+        case 'addCustomHoliday': {
+            const customs = settings.customHolidays || [];
+            const newHoliday = { name: message.name, start: message.start, end: message.end };
+            customs.push(newHoliday);
+            // Sort by start date
+            customs.sort((a, b) => a.start.localeCompare(b.start));
+            const updatedSettings1 = { ...settings, customHolidays: customs };
+            await chrome.storage.local.set({ settings: updatedSettings1 });
+            return { success: true, customHolidays: customs };
+        }
+
+        case 'removeCustomHoliday': {
+            const existingCustoms = settings.customHolidays || [];
+            const filtered = existingCustoms.filter((_, i) => i !== message.index);
+            const updatedSettings2 = { ...settings, customHolidays: filtered };
+            await chrome.storage.local.set({ settings: updatedSettings2 });
+            return { success: true, customHolidays: filtered };
+        }
 
         default:
             return { success: false, error: 'Unknown action' };
