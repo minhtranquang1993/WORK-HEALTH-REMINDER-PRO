@@ -11,7 +11,6 @@ class PopupController {
         this.loadTodoData();
         this.loadHolidays();
         this.loadWaterData();
-        this.loadCalendarStatus();
         this.startUpdating();
     }
 
@@ -83,12 +82,6 @@ class PopupController {
         this.btnSaveSettings = document.getElementById('btnSaveSettings');
         this.btnResetSettings = document.getElementById('btnResetSettings');
         this.btnTestTelegram = document.getElementById('btnTestTelegram');
-
-        // Calendar ICS
-        this.settingIcsUrl = document.getElementById('settingIcsUrl');
-        this.calendarStatus = document.getElementById('calendarStatus');
-        this.btnCalendarSync = document.getElementById('btnCalendarSync');
-        this.btnCalendarTest = document.getElementById('btnCalendarTest');
 
         // Water Tracker
         this.waterAmount = document.getElementById('waterAmount');
@@ -220,11 +213,6 @@ class PopupController {
         this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
         this.btnTestTelegram.addEventListener('click', () => this.testTelegram());
-
-        // Calendar ICS
-        this.btnCalendarSync?.addEventListener('click', () => this.calendarSyncNow());
-        this.btnCalendarTest?.addEventListener('click', () => this.calendarTest());
-        this.settingIcsUrl?.addEventListener('change', () => this.saveCalendarUrl());
 
         // Water Tracker
         this.btnWater200?.addEventListener('click', () => this.addWater(200));
@@ -557,47 +545,6 @@ class PopupController {
             this.showToast('🍅 Đã dừng Pomodoro');
         } catch (e) {
             console.log('Error stopping pomodoro:', e);
-        }
-    }
-
-    // ============================================
-    // CALENDAR ICS
-    // ============================================
-
-    async saveCalendarUrl() {
-        const url = this.settingIcsUrl?.value?.trim() || '';
-        const resp = await chrome.runtime.sendMessage({ action: 'saveCalendarUrl', url });
-        if (resp?.success) {
-            this.showToast(url ? '✅ ICS URL đã lưu! Đang sync...' : '🗑️ Đã xóa ICS URL');
-            this.loadCalendarStatus();
-        }
-    }
-
-    async calendarSyncNow() {
-        if (this.calendarStatus) this.calendarStatus.textContent = '🔄 Đang sync...';
-        const resp = await chrome.runtime.sendMessage({ action: 'syncCalendar' });
-        if (resp?.success) {
-            this.showToast(`✅ Synced ${resp.count} events!`);
-        } else {
-            this.showToast(`❌ ${resp?.error || 'Lỗi kết nối'}`);
-        }
-        this.loadCalendarStatus();
-    }
-
-    async calendarTest() {
-        const resp = await chrome.runtime.sendMessage({ action: 'getCalendarStatus' });
-        const meeting = resp?.meeting;
-        if (meeting) {
-            this.showToast(`📅 Đang trong: ${meeting.summary}`);
-        } else {
-            this.showToast(`✅ Không có meeting — nhắc nhở sẽ hoạt động bình thường`);
-        }
-    }
-
-    async loadCalendarStatus() {
-        const resp = await chrome.runtime.sendMessage({ action: 'getCalendarStatus' });
-        if (this.calendarStatus && resp?.status) {
-            this.calendarStatus.textContent = resp.status;
         }
     }
 
@@ -1198,9 +1145,6 @@ class PopupController {
                 // Notification
                 this.settingNotification.checked = s.notificationEnabled !== false;
 
-                // Calendar ICS
-                if (this.settingIcsUrl) this.settingIcsUrl.value = s.calendarIcsUrl || '';
-
                 // Water
                 if (this.settingWaterGoal) this.settingWaterGoal.value = s.waterGoalMl || 2000;
                 if (this.settingWaterCup) this.settingWaterCup.value = s.waterCupMl || 200;
@@ -1268,7 +1212,6 @@ class PopupController {
                 sleepReminderTime: this.parseTimeValue(this.settingSleepTime.value),
                 nightModeStart: this.parseTimeValue(this.settingNightMode.value),
                 notificationEnabled: this.settingNotification.checked,
-                calendarIcsUrl: this.settingIcsUrl?.value?.trim() || '',
                 waterGoalMl: parseInt(this.settingWaterGoal?.value) || 2000,
                 waterCupMl: parseInt(this.settingWaterCup?.value) || 200,
                 telegramBotToken: this.settingTelegramToken.value.trim(),
