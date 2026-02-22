@@ -785,7 +785,14 @@ async function checkPomodoroAndFocus(settings) {
 // Update timers countdown
 async function updateTimers() {
     const data = await chrome.storage.local.get(['timers', 'lastUpdate', 'settings']);
-    if (!data.timers || !data.settings || data.settings.isPaused) return;
+    if (!data.settings) return;
+    if (data.settings.isPaused) return;
+
+    // Auto-init timers nếu chưa có (lần đầu chạy hoặc sau reset)
+    if (!data.timers) {
+        await resetAllTimers();
+        return;
+    }
 
     const now = Date.now();
     const elapsed = Math.floor((now - data.lastUpdate) / 1000);
@@ -921,7 +928,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    handleMessage(message).then(sendResponse);
+    handleMessage(message)
+        .then(result => sendResponse(result || { success: false, error: 'No response' }))
+        .catch(err => {
+            console.error('[handleMessage] Error:', err);
+            sendResponse({ success: false, error: err.message });
+        });
     return true;
 });
 
@@ -1077,7 +1089,11 @@ async function handleGetStatus() {
         Object.assign(state, data.state);
     }
 
-    await updateTimers();
+    try {
+        await updateTimers();
+    } catch(e) {
+        console.log('[getStatus] updateTimers error:', e);
+    }
     const { timers } = await chrome.storage.local.get('timers');
 
     return {
