@@ -733,16 +733,18 @@ class HealthReminderApp(rumps.App):
         self.water_menu.add(None)
         self.water_menu.add(self.water_reset_item)
 
-        # Calendar submenu
-        self.calendar_menu = rumps.MenuItem("📅 Google Calendar")
-        self.calendar_status_item = rumps.MenuItem("⚙️ Chưa cấu hình")
+        # Calendar submenu (ICS-based, no login required)
+        self.calendar_menu = rumps.MenuItem("📅 Calendar")
+        self.calendar_status_item = rumps.MenuItem("⚙️ Chưa có ICS URL")
         self.calendar_toggle_item = rumps.MenuItem(
             "🔔 Bật auto-pause khi họp",
             callback=self.calendar_toggle_cb
         )
+        self.calendar_url_item = rumps.MenuItem("🔗 Nhập ICS URL...", callback=self.calendar_set_url_cb)
         self.calendar_sync_item = rumps.MenuItem("🔄 Sync ngay", callback=self.calendar_sync_now_cb)
         self.calendar_menu.add(self.calendar_status_item)
         self.calendar_menu.add(None)
+        self.calendar_menu.add(self.calendar_url_item)
         self.calendar_menu.add(self.calendar_toggle_item)
         self.calendar_menu.add(self.calendar_sync_item)
 
@@ -768,8 +770,8 @@ class HealthReminderApp(rumps.App):
         self.youtube_http_thread = threading.Thread(target=run_youtube_http_server, daemon=True)
         self.youtube_http_thread.start()
 
-        # Start Google Calendar background sync (nếu đã enable)
-        if CONFIG.calendar_enabled and calendar_sync.is_available:
+        # Start Calendar ICS sync (nếu đã enable)
+        if CONFIG.calendar_enabled and calendar_sync.is_configured:
             calendar_sync.start_background_sync()
 
         # Sync water tracker goal từ config
@@ -1402,42 +1404,52 @@ class HealthReminderApp(rumps.App):
     def calendar_toggle_cb(self, _):
         """Bật/tắt calendar integration"""
         global CONFIG
+        if not calendar_sync.is_configured:
+            send_notification(
+                "⚠️ Chưa có ICS URL",
+                "Vào 📅 Calendar → Nhập ICS URL trước nhé!"
+            )
+            return
+
         CONFIG.calendar_enabled = not CONFIG.calendar_enabled
+        calendar_sync.enabled = CONFIG.calendar_enabled
         save_config(CONFIG, INTERVALS)
 
         if CONFIG.calendar_enabled:
-            if not calendar_sync.is_available:
-                send_notification(
-                    "⚠️ Cần cài thư viện",
-                    "Chạy: pip install google-api-python-client google-auth-oauthlib"
-                )
-                CONFIG.calendar_enabled = False
-                save_config(CONFIG, INTERVALS)
-                return
-            if not calendar_sync.is_configured:
-                send_notification(
-                    "⚙️ Cần setup credentials",
-                    "Đặt file google_credentials.json vào ~/Library/Application Support/WorkHealthReminder/"
-                )
-                CONFIG.calendar_enabled = False
-                save_config(CONFIG, INTERVALS)
-                return
             calendar_sync.start_background_sync()
             send_notification("📅 Calendar bật", "Sẽ tự pause nhắc nhở khi đang trong meeting!")
         else:
+            calendar_sync.stop_background_sync()
             send_notification("📅 Calendar tắt", "Auto-pause đã tắt.")
 
     def calendar_sync_now_cb(self, _):
         """Sync calendar ngay lập tức"""
-        if not calendar_sync.is_available:
-            send_notification("⚠️ Chưa cài thư viện", "pip install google-api-python-client google-auth-oauthlib")
-            return
         if not calendar_sync.is_configured:
-            send_notification("⚙️ Chưa setup", "Cần file google_credentials.json")
+            send_notification("⚠️ Chưa có ICS URL", "Nhập ICS URL trong menu Calendar trước nhé!")
             return
-        import threading
-        threading.Thread(target=calendar_sync._sync_now, daemon=True).start()
-        send_notification("🔄 Đang sync...", "Google Calendar đang được đồng bộ.")
+        calendar_sync.sync_now_async()
+        send_notification("🔄 Đang sync...", "Calendar đang được đồng bộ từ ICS URL.")
+
+    def calendar_set_url_cb(self, _):
+        """Nhập ICS URL từ user"""
+        current_url = calendar_sync.ics_url or ''
+        script = f"""
+        set userInput to text returned of (display dialog "Nhập ICS URL của Google Calendar / Outlook / Apple Calendar:\n\nGoogle Calendar: Settings → tên lịch → Secret address in iCal format" with title "📅 Nhập ICS URL" default answer "{current_url}")
+        return userInput
+        """
+        import subprocess
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        url = result.stdout.strip()
+        if url and url.startswith('http'):
+            calendar_sync.ics_url = url
+            # Auto-enable và sync
+            CONFIG.calendar_enabled = True
+            calendar_sync.enabled = True
+            save_config(CONFIG, INTERVALS)
+            calendar_sync.start_background_sync()
+            send_notification("✅ ICS URL đã lưu!", "Đang sync lịch... Sẽ tự pause khi có meeting!")
+        elif url and not url.startswith('http'):
+            send_notification("❌ URL không hợp lệ", "URL phải bắt đầu bằng https://")
 
     def quit_app(self, _):
         """Thoát ứng dụng"""
@@ -1470,8 +1482,8 @@ class HealthReminderApp(rumps.App):
                         time.sleep(5)
                         continue
 
-                    # Auto-pause nếu đang trong meeting (Google Calendar)
-                    if CONFIG.calendar_enabled and calendar_sync.is_available:
+                    # Auto-pause nếu đang trong meeting (ICS Calendar)
+                    if CONFIG.calendar_enabled and calendar_sync.is_configured:
                         should_pause, reason = calendar_sync.should_pause_reminders()
                         if should_pause:
                             if not getattr(self, '_calendar_pause_notified', False):
