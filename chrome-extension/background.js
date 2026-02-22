@@ -409,12 +409,12 @@ function checkHoliday(settings, date) {
 
 // Check if today is a work day
 function isWorkDay(settings) {
-    // Check holidays first
-    const holiday = checkHoliday(settings);
-    if (holiday.isHoliday) return false;
+    // [Holiday check temporarily disabled - re-enable later]
+    // const holiday = checkHoliday(settings);
+    // if (holiday.isHoliday) return false;
 
-    // Check work period date range
-    if (!isWithinWorkPeriod(settings)) return false;
+    // [Work period check temporarily disabled]
+    // if (!isWithinWorkPeriod(settings)) return false;
 
     const today = new Date().getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const dayOfWeek = today === 0 ? 6 : today - 1; // Convert to Monday=0, Sunday=6
@@ -563,10 +563,7 @@ function getWorkStatus(settings) {
     }
 
     if (!isWorkDay(settings)) {
-        const holiday = checkHoliday(settings);
-        if (holiday.isHoliday) {
-            return { status: 'holiday', label: `🎌 ${holiday.name}`, color: 'red' };
-        }
+        // [Holiday label temporarily disabled]
         const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
         const today = days[new Date().getDay()];
         return { status: 'weekend', label: `🎉 Ngày nghỉ (${today})`, color: 'purple' };
@@ -806,7 +803,9 @@ async function updateTimers() {
     const isFocusActive = state.focusEndTime && Date.now() < state.focusEndTime;
     const isPomodoroActive = state.pomodoroState !== null;
 
-    if (!isWorkTime(data.settings) || isFocusActive || isPomodoroActive) return;
+    // Allow timer countdown always (not just during work hours)
+    // if (!isWorkTime(data.settings) || isFocusActive || isPomodoroActive) return;
+    if (isFocusActive || isPomodoroActive) return;
 
     const timers = data.timers;
     for (const key in timers) {
