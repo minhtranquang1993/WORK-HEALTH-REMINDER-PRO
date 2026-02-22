@@ -334,6 +334,12 @@ class PopupController {
             }
         } catch (e) {
             console.log('Error getting status:', e);
+            // Fallback: show default status thay vì stuck "Đang kiểm tra..."
+            if (this.statusText && this.statusText.textContent === 'Đang kiểm tra...') {
+                this.statusText.textContent = '⏳ Đang kết nối...';
+                // Retry sau 2 giây
+                setTimeout(() => this.updateDisplay(), 2000);
+            }
         }
 
         // Update YouTube (every 2 seconds to reduce load)
@@ -1031,24 +1037,12 @@ class PopupController {
     async loadHolidays() {
         try {
             const response = await chrome.runtime.sendMessage({ action: 'getHolidays' });
-            if (response) {
-                // Render fixed holidays (dùng cả khi success=false để debug)
-                const fixed = response.fixedHolidays || [];
-                const custom = response.customHolidays || [];
-                this.renderFixedHolidays(fixed);
-                this.renderCustomHolidays(custom);
-
-                // Nếu chưa có data, show placeholder
-                if (fixed.length === 0) {
-                    const container = document.getElementById('fixedHolidayList');
-                    if (container) container.innerHTML = '<div class="holiday-empty">Đang tải lịch nghỉ lễ...</div>';
-                }
+            if (response && response.success) {
+                this.renderFixedHolidays(response.fixedHolidays);
+                this.renderCustomHolidays(response.customHolidays);
             }
         } catch (e) {
             console.log('Error loading holidays:', e);
-            // Fallback: show error state
-            const container = document.getElementById('fixedHolidayList');
-            if (container) container.innerHTML = '<div class="holiday-empty">⚠️ Không tải được lịch nghỉ lễ</div>';
         }
     }
 
