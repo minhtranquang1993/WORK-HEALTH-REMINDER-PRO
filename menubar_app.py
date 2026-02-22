@@ -34,22 +34,44 @@ from calendar_sync import calendar_sync
 # VIETNAMESE HOLIDAYS 2025-2026
 # ============================================
 
-VN_HOLIDAYS = [
-    # ── 2025 ──────────────────────────────────────────
-    {"name": "Tết Dương lịch 2025",         "start": "2025-01-01", "end": "2025-01-01"},
-    {"name": "Tết Nguyên Đán 2025",          "start": "2025-01-27", "end": "2025-02-02"},  # 27/1–2/2
-    {"name": "Giỗ Tổ Hùng Vương 2025",      "start": "2025-04-07", "end": "2025-04-07"},  # 10/3 Âm lịch
-    {"name": "Ngày Giải phóng 30/4/2025",   "start": "2025-04-30", "end": "2025-04-30"},
-    {"name": "Quốc tế Lao động 1/5/2025",   "start": "2025-05-01", "end": "2025-05-01"},
-    {"name": "Quốc khánh 2/9/2025",         "start": "2025-09-01", "end": "2025-09-03"},  # nghỉ bù
-    # ── 2026 ──────────────────────────────────────────
-    {"name": "Tết Dương lịch 2026",         "start": "2026-01-01", "end": "2026-01-01"},
-    {"name": "Tết Nguyên Đán 2026",          "start": "2026-02-15", "end": "2026-02-22"},  # 27/1–3/2 Âm lịch
-    {"name": "Giỗ Tổ Hùng Vương 2026",      "start": "2026-04-26", "end": "2026-04-26"},  # 10/3 Âm lịch
-    {"name": "Ngày Giải phóng 30/4/2026",   "start": "2026-04-30", "end": "2026-04-30"},
-    {"name": "Quốc tế Lao động 1/5/2026",   "start": "2026-05-01", "end": "2026-05-01"},
-    {"name": "Quốc khánh 2/9/2026",         "start": "2026-09-02", "end": "2026-09-03"},  # nghỉ bù
+# Ngày lễ cố định (recurring hàng năm)
+VN_HOLIDAYS_FIXED = [
+    {"name": "Tết Dương lịch",          "month": 1,  "day": 1,  "days": 1},
+    {"name": "Ngày Giải phóng miền Nam", "month": 4,  "day": 30, "days": 1},
+    {"name": "Quốc tế Lao động",        "month": 5,  "day": 1,  "days": 1},
+    {"name": "Quốc khánh",              "month": 9,  "day": 2,  "days": 2},  # 2/9 + nghỉ bù
 ]
+
+# Ngày lễ Âm lịch (mỗi năm khác ngày Dương)
+VN_HOLIDAYS_LUNAR = [
+    {"name": "Tết Nguyên Đán 2025",      "start": "2025-01-27", "end": "2025-02-02"},
+    {"name": "Giỗ Tổ Hùng Vương 2025",   "start": "2025-04-07", "end": "2025-04-07"},
+    {"name": "Tết Nguyên Đán 2026",      "start": "2026-02-15", "end": "2026-02-22"},
+    {"name": "Giỗ Tổ Hùng Vương 2026",   "start": "2026-04-26", "end": "2026-04-26"},
+    {"name": "Tết Nguyên Đán 2027",      "start": "2027-02-04", "end": "2027-02-10"},
+    {"name": "Giỗ Tổ Hùng Vương 2027",   "start": "2027-04-15", "end": "2027-04-15"},
+]
+
+
+def get_vn_holidays(year=None):
+    """Build danh sách ngày lễ VN cho năm cụ thể"""
+    if not year:
+        year = datetime.now().year
+    holidays = []
+    for h in VN_HOLIDAYS_FIXED:
+        start = f"{year}-{h['month']:02d}-{h['day']:02d}"
+        end_day = h['day'] + h['days'] - 1
+        end = f"{year}-{h['month']:02d}-{end_day:02d}"
+        holidays.append({"name": h['name'], "start": start, "end": end})
+    for h in VN_HOLIDAYS_LUNAR:
+        if h['start'].startswith(str(year)):
+            holidays.append(h)
+    holidays.sort(key=lambda x: x['start'])
+    return holidays
+
+
+# Build cho năm nay + năm sau
+VN_HOLIDAYS = get_vn_holidays(datetime.now().year) + get_vn_holidays(datetime.now().year + 1)
 
 
 def check_holiday(custom_holidays=None):
