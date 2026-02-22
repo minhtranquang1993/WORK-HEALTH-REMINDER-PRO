@@ -62,16 +62,16 @@ class WorkConfig:
 
 @dataclass
 class ReminderInterval:
-    # Based on scientific recommendations
+    # Based on scientific recommendations (updated to match evidence-based guidelines)
     walk: int = 30           # Columbia University: 5-min walk every 30 min
-    water: int = 30          # Hydration experts: drink regularly every 20-30 min
-    toilet: int = 60
+    water: int = 45          # WHO hydration: drink water every 45-60 min
+    toilet: int = 60         # Optional - kept for users who want it
     eye_20_20_20: int = 20   # AAO 20-20-20 rule: every 20 min
-    blink: int = 2           # Research: blink reminder every 1-2 min during screen use
+    blink: int = 15          # Dry eye research: blink reminder every 15 min
     posture: int = 20        # Cornell 20-8-2 rule: check posture every 20 min
     neck_stretch: int = 30   # Ergonomics: stretch every 20-30 min
-    eye_exercise: int = 90
-    breathing: int = 120
+    eye_exercise: int = 60   # AAO: eye exercise every 60 min
+    breathing: int = 60      # Mindfulness research: breathing exercise every 60 min
 
 
 # ============================================
