@@ -30,6 +30,111 @@ except ImportError:
 from water_tracker import water_tracker
 from calendar_sync import calendar_sync
 
+# ============================================
+# VIETNAMESE HOLIDAYS 2025-2026
+# ============================================
+
+VN_HOLIDAYS = [
+    {"name": "Tết Dương lịch 2025", "date": "2025-01-01"},
+    {"name": "Tết Nguyên Đán 2025", "start": "2025-01-27", "end": "2025-02-02"},
+    {"name": "Giỗ Tổ Hùng Vương 2025", "date": "2025-04-07"},
+    {"name": "30/4 - 1/5 2025", "start": "2025-04-30", "end": "2025-05-01"},
+    {"name": "Quốc khánh 2/9 2025", "start": "2025-09-01", "end": "2025-09-03"},
+    {"name": "Tết Dương lịch 2026", "date": "2026-01-01"},
+    {"name": "Tết Nguyên Đán 2026", "start": "2026-01-26", "end": "2026-02-01"},
+    {"name": "Giỗ Tổ Hùng Vương 2026", "date": "2026-04-26"},
+    {"name": "30/4 - 1/5 2026", "start": "2026-04-30", "end": "2026-05-01"},
+    {"name": "Quốc khánh 2/9 2026", "start": "2026-09-02", "end": "2026-09-03"},
+]
+
+
+def check_holiday(custom_holidays=None):
+    """Kiểm tra hôm nay có phải ngày lễ không"""
+    today = datetime.now().date()
+    today_str = today.strftime('%Y-%m-%d')
+
+    for h in VN_HOLIDAYS:
+        if 'date' in h:
+            if h['date'] == today_str:
+                return {'is_holiday': True, 'name': h['name']}
+        else:
+            start = datetime.strptime(h['start'], '%Y-%m-%d').date()
+            end = datetime.strptime(h['end'], '%Y-%m-%d').date()
+            if start <= today <= end:
+                return {'is_holiday': True, 'name': h['name']}
+
+    for h in (custom_holidays or []):
+        try:
+            if 'date' in h:
+                if h['date'] == today_str:
+                    return {'is_holiday': True, 'name': h.get('name', 'Ngày nghỉ')}
+            else:
+                start = datetime.strptime(h['start'], '%Y-%m-%d').date()
+                end = datetime.strptime(h['end'], '%Y-%m-%d').date()
+                if start <= today <= end:
+                    return {'is_holiday': True, 'name': h.get('name', 'Ngày nghỉ')}
+        except Exception:
+            continue
+
+    return {'is_holiday': False, 'name': ''}
+
+
+def is_work_period_valid(config) -> bool:
+    """Kiểm tra có trong work period không (False = đang nghỉ phép/tạm dừng)"""
+    if not config.work_period_enabled:
+        return True
+    today = datetime.now().date()
+    if config.work_period_start:
+        start = datetime.strptime(config.work_period_start, '%Y-%m-%d').date()
+        if today < start:
+            return False
+    if config.work_period_end:
+        end = datetime.strptime(config.work_period_end, '%Y-%m-%d').date()
+        if today > end:
+            return False
+    return True
+
+
+def is_focus_active_fn(config) -> bool:
+    return config.focus_end_time > time.time()
+
+
+def get_focus_remaining(config) -> int:
+    return max(0, int((config.focus_end_time - time.time()) / 60))
+
+
+async def send_telegram_report(is_test=False):
+    """Gửi báo cáo Todo cuối ngày qua Telegram"""
+    if not CONFIG.telegram_bot_token or not CONFIG.telegram_chat_id:
+        return False, "Chưa cấu hình Telegram"
+
+    now = datetime.now()
+    date_str = now.strftime('%A, %d/%m').upper()
+
+    msg = f"📅 <b>BÁO CÁO NGÀY {date_str}</b>\n"
+    msg += f"------------------------------\n"
+
+    if is_test:
+        msg = f"⚠️ <b>TEST NOTIFICATION</b>\n\n" + msg
+        msg += "📝 Đây là tin nhắn thử nghiệm từ Work Health Reminder!"
+
+    try:
+        import urllib.request as ur
+        import json as jn
+        url = f"https://api.telegram.org/bot{CONFIG.telegram_bot_token}/sendMessage"
+        data = jn.dumps({
+            "chat_id": CONFIG.telegram_chat_id,
+            "text": msg,
+            "parse_mode": "HTML"
+        }).encode()
+        req = ur.Request(url, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        with ur.urlopen(req, timeout=10) as resp:
+            result = jn.loads(resp.read())
+            return result.get('ok', False), ""
+    except Exception as e:
+        return False, str(e)
+
 from exercises import (
     NECK_EXERCISES, SHOULDER_EXERCISES, EYE_EXERCISES, 
     BREATHING_EXERCISES, POSTURE_CHECK, RULE_20_20_20
@@ -61,6 +166,22 @@ class WorkConfig:
     water_goal_ml: int = 2000    # Mục tiêu uống nước/ngày (ml)
     water_cup_ml: int = 200      # Lượng nước mỗi ly (ml)
     calendar_enabled: bool = False  # Bật/tắt Google Calendar integration
+
+    # Focus Mode
+    focus_end_time: float = 0.0  # epoch seconds, 0 = not active
+
+    # Work Period (tạm nghỉ)
+    work_period_enabled: bool = False
+    work_period_start: str = ''  # YYYY-MM-DD
+    work_period_end: str = ''    # YYYY-MM-DD
+
+    # Custom Holidays
+    custom_holidays: list = None  # [{'name': str, 'start': 'YYYY-MM-DD', 'end': 'YYYY-MM-DD'}]
+
+    # Telegram Report
+    telegram_bot_token: str = ''
+    telegram_chat_id: str = ''
+    telegram_report_time: tuple = (17, 0)  # (hour, minute)
 
     # Pomodoro
     pomodoro_work: int = 25
@@ -237,6 +358,13 @@ def save_config(config: WorkConfig, intervals: ReminderInterval) -> bool:
             "water_goal_ml": config.water_goal_ml,
             "water_cup_ml": config.water_cup_ml,
             "calendar_enabled": config.calendar_enabled,
+            "work_period_enabled": config.work_period_enabled,
+            "work_period_start": config.work_period_start,
+            "work_period_end": config.work_period_end,
+            "custom_holidays": config.custom_holidays or [],
+            "telegram_bot_token": config.telegram_bot_token,
+            "telegram_chat_id": config.telegram_chat_id,
+            "telegram_report_time": list(config.telegram_report_time),
         },
         "intervals": {
             "walk": intervals.walk,
@@ -291,6 +419,13 @@ def load_config() -> tuple:
             water_goal_ml=wc.get("water_goal_ml", 2000),
             water_cup_ml=wc.get("water_cup_ml", 200),
             calendar_enabled=wc.get("calendar_enabled", False),
+            work_period_enabled=wc.get("work_period_enabled", False),
+            work_period_start=wc.get("work_period_start", ""),
+            work_period_end=wc.get("work_period_end", ""),
+            custom_holidays=wc.get("custom_holidays", []),
+            telegram_bot_token=wc.get("telegram_bot_token", ""),
+            telegram_chat_id=wc.get("telegram_chat_id", ""),
+            telegram_report_time=tuple(wc.get("telegram_report_time", [17, 0])),
         )
 
         reminder_intervals = ReminderInterval(
@@ -715,6 +850,42 @@ class HealthReminderApp(rumps.App):
         self.quick_menu.add(rumps.MenuItem("👁️ Đã nhìn xa", callback=self.reset_eye))
         self.quick_menu.add(rumps.MenuItem("🔄 Reset tất cả", callback=self.reset_all_timers))
 
+        # Focus Mode submenu
+        self.focus_menu = rumps.MenuItem("🎯 Focus Mode")
+        self.focus_status_item = rumps.MenuItem("💡 Tập trung không bị làm phiền")
+        self.focus_15 = rumps.MenuItem("⏱️ 15 phút", callback=lambda _: self.start_focus(15))
+        self.focus_30 = rumps.MenuItem("⏱️ 30 phút", callback=lambda _: self.start_focus(30))
+        self.focus_45 = rumps.MenuItem("⏱️ 45 phút", callback=lambda _: self.start_focus(45))
+        self.focus_60 = rumps.MenuItem("⏱️ 60 phút", callback=lambda _: self.start_focus(60))
+        self.focus_end_item = rumps.MenuItem("⛔ Kết thúc Focus", callback=self.end_focus)
+        for item in [self.focus_status_item, None, self.focus_15, self.focus_30,
+                     self.focus_45, self.focus_60, None, self.focus_end_item]:
+            self.focus_menu.add(item)
+
+        # Work Period submenu
+        self.work_period_menu = rumps.MenuItem("🏖️ Chế độ nghỉ phép")
+        self.work_period_status = rumps.MenuItem("📅 Chưa bật")
+        self.work_period_toggle = rumps.MenuItem("🔔 Bật chế độ nghỉ", callback=self.work_period_toggle_cb)
+        self.work_period_set = rumps.MenuItem("📅 Đặt ngày nghỉ...", callback=self.work_period_set_cb)
+        for item in [self.work_period_status, None, self.work_period_toggle, self.work_period_set]:
+            self.work_period_menu.add(item)
+
+        # Holidays submenu
+        self.holiday_menu = rumps.MenuItem("🎌 Ngày lễ")
+        self.holiday_status_item = rumps.MenuItem("📅 Hôm nay: ngày thường")
+        self.holiday_add_item = rumps.MenuItem("➕ Thêm ngày nghỉ...", callback=self.holiday_add_cb)
+        self.holiday_list_item = rumps.MenuItem("📋 Danh sách ngày nghỉ", callback=self.holiday_list_cb)
+        for item in [self.holiday_status_item, None, self.holiday_add_item, self.holiday_list_item]:
+            self.holiday_menu.add(item)
+
+        # Telegram submenu
+        self.telegram_menu = rumps.MenuItem("📱 Telegram")
+        self.telegram_status_item = rumps.MenuItem("⚙️ Chưa cấu hình")
+        self.telegram_set_item = rumps.MenuItem("🔑 Cài đặt Bot Token...", callback=self.telegram_set_cb)
+        self.telegram_test_item = rumps.MenuItem("📢 Test gửi tin nhắn", callback=self.telegram_test_cb)
+        for item in [self.telegram_status_item, None, self.telegram_set_item, self.telegram_test_item]:
+            self.telegram_menu.add(item)
+
         # Water Tracker submenu
         self.water_menu = rumps.MenuItem("💧 Nước hôm nay")
         self.water_status_item = rumps.MenuItem("💧 0 / 2000ml (0%)")
@@ -789,8 +960,12 @@ class HealthReminderApp(rumps.App):
             self.pomodoro_menu,
             None,
             self.exercise_menu,
+            self.focus_menu,
             self.water_menu,
             self.calendar_menu,
+            self.work_period_menu,
+            self.holiday_menu,
+            self.telegram_menu,
             self.youtube_menu,
             self.quick_menu,
             None,
@@ -1360,6 +1535,173 @@ class HealthReminderApp(rumps.App):
         water_tracker.reset_today()
         send_notification("🔄 Đã reset", "Lượng nước hôm nay đã về 0ml.")
 
+    # ============================================
+    # FOCUS MODE
+    # ============================================
+
+    def start_focus(self, minutes: int):
+        global CONFIG
+        CONFIG.focus_end_time = time.time() + minutes * 60
+        save_config(CONFIG, INTERVALS)
+        send_notification("🎯 Focus Mode bật", f"Tập trung {minutes} phút — tất cả nhắc nhở tạm dừng!")
+        self.update_focus_menu()
+
+    def end_focus(self, _=None):
+        global CONFIG
+        CONFIG.focus_end_time = 0.0
+        save_config(CONFIG, INTERVALS)
+        send_notification("✅ Focus Mode kết thúc", "Các nhắc nhở sức khỏe đã được khôi phục!")
+        self.update_focus_menu()
+
+    def update_focus_menu(self):
+        if is_focus_active_fn(CONFIG):
+            remaining = get_focus_remaining(CONFIG)
+            self.focus_status_item.title = f"⏱️ Đang focus — còn {remaining} phút"
+            self.focus_menu.title = f"🎯 Focus ({remaining}p)"
+        else:
+            self.focus_status_item.title = "💡 Tập trung không bị làm phiền"
+            self.focus_menu.title = "🎯 Focus Mode"
+
+    # ============================================
+    # WORK PERIOD (NGHỈ PHÉP)
+    # ============================================
+
+    def work_period_toggle_cb(self, _):
+        global CONFIG
+        CONFIG.work_period_enabled = not CONFIG.work_period_enabled
+        save_config(CONFIG, INTERVALS)
+        if CONFIG.work_period_enabled:
+            send_notification("🏖️ Chế độ nghỉ bật", "Nhắc nhở sẽ tạm dừng trong thời gian nghỉ!")
+        else:
+            send_notification("🏖️ Chế độ nghỉ tắt", "Nhắc nhở đã hoạt động trở lại.")
+        self.update_work_period_menu()
+
+    def work_period_set_cb(self, _):
+        global CONFIG
+        import subprocess
+        default_start = CONFIG.work_period_start or datetime.now().strftime('%Y-%m-%d')
+        default_end = CONFIG.work_period_end or datetime.now().strftime('%Y-%m-%d')
+        script = (
+            'set startDate to text returned of (display dialog "Ngày bắt đầu nghỉ (YYYY-MM-DD):" '
+            'with title "Ngày nghỉ" default answer "' + default_start + '")\n'
+            'set endDate to text returned of (display dialog "Ngày kết thúc nghỉ (YYYY-MM-DD):" '
+            'with title "Ngày nghỉ" default answer "' + default_end + '")\n'
+            'return startDate & "," & endDate'
+        )
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        val = result.stdout.strip()
+        if val and ',' in val:
+            start, end = val.split(',', 1)
+            CONFIG.work_period_start = start.strip()
+            CONFIG.work_period_end = end.strip()
+            CONFIG.work_period_enabled = True
+            save_config(CONFIG, INTERVALS)
+            send_notification("🏖️ Đã lưu!", f"Nghỉ từ {CONFIG.work_period_start} đến {CONFIG.work_period_end}")
+            self.update_work_period_menu()
+
+    def update_work_period_menu(self):
+        if CONFIG.work_period_enabled:
+            s = CONFIG.work_period_start or '?'
+            e = CONFIG.work_period_end or '?'
+            self.work_period_status.title = f"📅 {s} → {e}"
+            self.work_period_toggle.title = "🔕 Tắt chế độ nghỉ"
+        else:
+            self.work_period_status.title = "📅 Chưa bật"
+            self.work_period_toggle.title = "🔔 Bật chế độ nghỉ"
+
+    # ============================================
+    # HOLIDAYS
+    # ============================================
+
+    def holiday_add_cb(self, _):
+        global CONFIG
+        import subprocess
+        default_date = datetime.now().strftime('%Y-%m-%d')
+        script = (
+            'set hName to text returned of (display dialog "Tên ngày nghỉ:" '
+            'with title "Them ngay nghi" default answer "Nghi le")\n'
+            'set hStart to text returned of (display dialog "Ngay bat dau (YYYY-MM-DD):" '
+            'with title "Them ngay nghi" default answer "' + default_date + '")\n'
+            'set hEnd to text returned of (display dialog "Ngay ket thuc (YYYY-MM-DD):" '
+            'with title "Them ngay nghi" default answer "' + default_date + '")\n'
+            'return hName & "|" & hStart & "|" & hEnd'
+        )
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        val = result.stdout.strip()
+        if val and '|' in val:
+            parts = val.split('|')
+            if len(parts) == 3:
+                if CONFIG.custom_holidays is None:
+                    CONFIG.custom_holidays = []
+                CONFIG.custom_holidays.append({
+                    'name': parts[0].strip(),
+                    'start': parts[1].strip(),
+                    'end': parts[2].strip()
+                })
+                save_config(CONFIG, INTERVALS)
+                send_notification("🎌 Đã thêm!", f"Ngày nghỉ: {parts[0].strip()}")
+                self.update_holiday_menu()
+
+    def holiday_list_cb(self, _):
+        customs = CONFIG.custom_holidays or []
+        if not customs:
+            send_notification("🎌 Ngày nghỉ tùy chỉnh", "Chưa có ngày nghỉ nào được thêm.")
+            return
+        lines = [f"• {h.get('name','?')}: {h.get('start','?')} - {h.get('end','?')}" for h in customs]
+        send_notification("🎌 Danh sách ngày nghỉ", "\n".join(lines[:5]))
+
+    def update_holiday_menu(self):
+        holiday = check_holiday(CONFIG.custom_holidays)
+        if holiday['is_holiday']:
+            self.holiday_status_item.title = f"🎌 Hôm nay: {holiday['name']}"
+        else:
+            self.holiday_status_item.title = "📅 Hôm nay: ngày thường"
+
+    # ============================================
+    # TELEGRAM
+    # ============================================
+
+    def telegram_set_cb(self, _):
+        global CONFIG
+        import subprocess
+        script = (
+            'set botToken to text returned of (display dialog "Nhap Bot Token (tu @BotFather):" '
+            'with title "Telegram Setup" default answer "' + CONFIG.telegram_bot_token + '")\n'
+            'set chatId to text returned of (display dialog "Nhap Chat ID (tu @userinfobot):" '
+            'with title "Telegram Setup" default answer "' + CONFIG.telegram_chat_id + '")\n'
+            'return botToken & "|" & chatId'
+        )
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        val = result.stdout.strip()
+        if val and '|' in val:
+            parts = val.split('|', 1)
+            CONFIG.telegram_bot_token = parts[0].strip()
+            CONFIG.telegram_chat_id = parts[1].strip()
+            save_config(CONFIG, INTERVALS)
+            send_notification("✅ Telegram đã lưu!", "Bấm Test để kiểm tra.")
+            self.update_telegram_menu()
+
+    def telegram_test_cb(self, _):
+        if not CONFIG.telegram_bot_token or not CONFIG.telegram_chat_id:
+            send_notification("⚠️ Chưa cấu hình", "Vào Telegram → Cài đặt Bot Token trước nhé!")
+            return
+        import asyncio
+        def run_test():
+            import asyncio as aio
+            ok, err = aio.run(send_telegram_report(is_test=True))
+            if ok:
+                send_notification("✅ Gửi thành công!", "Kiểm tra Telegram của bạn nhé!")
+            else:
+                send_notification("❌ Gửi thất bại", err or "Kiểm tra lại token và chat ID")
+        threading.Thread(target=run_test, daemon=True).start()
+
+    def update_telegram_menu(self):
+        if CONFIG.telegram_bot_token and CONFIG.telegram_chat_id:
+            h, m = CONFIG.telegram_report_time
+            self.telegram_status_item.title = f"✅ Đã cấu hình — Báo cáo lúc {h:02d}:{m:02d}"
+        else:
+            self.telegram_status_item.title = "⚙️ Chưa cấu hình"
+
     def edit_water_goal(self, _):
         """Chỉnh mục tiêu uống nước"""
         global CONFIG
@@ -1482,6 +1824,22 @@ class HealthReminderApp(rumps.App):
                         time.sleep(5)
                         continue
 
+                    # Skip nếu ngày lễ
+                    holiday = check_holiday(CONFIG.custom_holidays)
+                    if holiday['is_holiday']:
+                        time.sleep(60)
+                        continue
+
+                    # Skip nếu đang trong work period nghỉ
+                    if not is_work_period_valid(CONFIG):
+                        time.sleep(60)
+                        continue
+
+                    # Skip nếu đang Focus Mode
+                    if is_focus_active_fn(CONFIG):
+                        time.sleep(5)
+                        continue
+
                     # Auto-pause nếu đang trong meeting (ICS Calendar)
                     if CONFIG.calendar_enabled and calendar_sync.is_configured:
                         should_pause, reason = calendar_sync.should_pause_reminders()
@@ -1518,9 +1876,22 @@ class HealthReminderApp(rumps.App):
         """Kiểm tra các mốc thời gian đặc biệt"""
         current_time = (now.hour, now.minute)
 
+        # Telegram daily report
+        report_h, report_m = CONFIG.telegram_report_time
+        if (CONFIG.telegram_bot_token and CONFIG.telegram_chat_id
+                and current_time == (report_h, report_m)
+                and not getattr(self, '_telegram_reported_today', False)):
+            import asyncio
+            threading.Thread(
+                target=lambda: asyncio.run(send_telegram_report()),
+                daemon=True
+            ).start()
+            self._telegram_reported_today = True
+
         # Reset daily flags at midnight
         if current_time == (0, 0):
             self.tracker.reset_daily()
+            self._telegram_reported_today = False
 
         # Morning reminder (7:30 - work_start)
         if is_morning_reminder_window() and not self.tracker.morning_reminded and not self.tracker.work_started_today:
