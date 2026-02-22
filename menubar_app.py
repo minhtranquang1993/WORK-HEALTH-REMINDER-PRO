@@ -295,14 +295,14 @@ def load_config() -> tuple:
 
         reminder_intervals = ReminderInterval(
             walk=intervals.get("walk", 30),
-            water=intervals.get("water", 30),
+            water=intervals.get("water", 45),
             toilet=intervals.get("toilet", 60),
             eye_20_20_20=intervals.get("eye_20_20_20", 20),
-            blink=intervals.get("blink", 2),
+            blink=intervals.get("blink", 15),
             posture=intervals.get("posture", 20),
             neck_stretch=intervals.get("neck_stretch", 30),
-            eye_exercise=intervals.get("eye_exercise", 90),
-            breathing=intervals.get("breathing", 120),
+            eye_exercise=intervals.get("eye_exercise", 60),
+            breathing=intervals.get("breathing", 60),
         )
 
         return config, reminder_intervals
