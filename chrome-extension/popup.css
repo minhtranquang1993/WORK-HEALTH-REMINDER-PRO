@@ -2350,3 +2350,51 @@ select:focus {
 .water-btn.water-reset:hover {
     background: rgba(150, 150, 150, 0.2);
 }
+
+/* ============================================
+   CALENDAR ICS
+   ============================================ */
+
+.calendar-status {
+    font-size: 11px;
+    color: var(--text-secondary, #666);
+    padding: 6px 8px;
+    background: rgba(76, 175, 80, 0.08);
+    border-radius: 6px;
+    margin: 8px 0;
+}
+
+.calendar-actions {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.calendar-howto {
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+    background: rgba(0,0,0,0.04);
+    border-radius: 6px;
+    padding: 8px 10px;
+    line-height: 1.6;
+    margin-top: 8px;
+}
+
+.calendar-howto em {
+    color: #2196F3;
+    font-style: normal;
+    font-weight: 500;
+}
+
+.section-desc {
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+    margin: -4px 0 10px;
+    line-height: 1.5;
+}
+
+.setting-hint {
+    font-size: 10px;
+    color: var(--text-secondary, #aaa);
+    margin-left: 4px;
+}
