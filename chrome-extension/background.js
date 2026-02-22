@@ -409,12 +409,13 @@ function checkHoliday(settings, date) {
 
 // Check if today is a work day
 function isWorkDay(settings) {
-    // [Holiday check temporarily disabled - re-enable later]
-    // const holiday = checkHoliday(settings);
-    // if (holiday.isHoliday) return false;
-
-    // [Work period check temporarily disabled]
-    // if (!isWithinWorkPeriod(settings)) return false;
+    try {
+        const holiday = checkHoliday(settings);
+        if (holiday.isHoliday) return false;
+        if (!isWithinWorkPeriod(settings)) return false;
+    } catch(e) {
+        console.warn('[isWorkDay] Holiday/period check error:', e);
+    }
 
     const today = new Date().getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const dayOfWeek = today === 0 ? 6 : today - 1; // Convert to Monday=0, Sunday=6
@@ -563,7 +564,12 @@ function getWorkStatus(settings) {
     }
 
     if (!isWorkDay(settings)) {
-        // [Holiday label temporarily disabled]
+        try {
+            const holiday = checkHoliday(settings);
+            if (holiday.isHoliday) {
+                return { status: 'holiday', label: `🎌 ${holiday.name}`, color: 'red' };
+            }
+        } catch(e) { /* ignore */ }
         const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
         const today = days[new Date().getDay()];
         return { status: 'weekend', label: `🎉 Ngày nghỉ (${today})`, color: 'purple' };
@@ -803,8 +809,10 @@ async function updateTimers() {
     const isFocusActive = state.focusEndTime && Date.now() < state.focusEndTime;
     const isPomodoroActive = state.pomodoroState !== null;
 
-    // Allow timer countdown always (not just during work hours)
-    // if (!isWorkTime(data.settings) || isFocusActive || isPomodoroActive) return;
+    // Countdown only during work hours
+    try {
+        if (!isWorkTime(data.settings)) return;
+    } catch(e) { /* ignore, keep counting */ }
     if (isFocusActive || isPomodoroActive) return;
 
     const timers = data.timers;
@@ -924,6 +932,75 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         notifyMenubarApp(message.videoInfo);
 
         sendResponse({ success: true });
+        return true;
+    }
+
+    // ── getStatus: handled directly (never goes through async handleMessage) ──
+    if (message.action === 'getStatus') {
+        (async () => {
+            try {
+                const data = await chrome.storage.local.get(['settings', 'timers', 'lastUpdate', 'state']);
+                const settings = data.settings || DEFAULT_SETTINGS;
+                let timers = data.timers;
+
+                if (data.state) Object.assign(state, data.state);
+
+                // Auto-init timers nếu chưa có
+                if (!timers) {
+                    timers = {};
+                    const ivl = settings.intervals || DEFAULT_SETTINGS.intervals;
+                    for (const key of Object.keys(ivl)) {
+                        timers[key] = ivl[key] * 60;
+                    }
+                    await chrome.storage.local.set({ timers, lastUpdate: Date.now() });
+                }
+
+                // Countdown timers (only during work hours + not focus/pomo)
+                const now = Date.now();
+                const elapsed = data.lastUpdate ? Math.floor((now - data.lastUpdate) / 1000) : 0;
+                const isFocusActive = state.focusEndTime && now < state.focusEndTime;
+                const isPomodoroActive = state.pomodoroState !== null;
+
+                if (!settings.isPaused && !isFocusActive && !isPomodoroActive && elapsed > 0 && elapsed < 3600) {
+                    const ivl = settings.intervals || DEFAULT_SETTINGS.intervals;
+                    for (const key in timers) {
+                        timers[key] = Math.max(0, timers[key] - elapsed);
+                        if (timers[key] === 0 && ivl[key]) {
+                            timers[key] = ivl[key] * 60;
+                        }
+                    }
+                    await chrome.storage.local.set({ timers, lastUpdate: now });
+                }
+
+                let workStatus;
+                try {
+                    workStatus = getWorkStatus(settings);
+                } catch(e) {
+                    console.warn('[getStatus] getWorkStatus error:', e);
+                    workStatus = { status: 'working', label: '🟢 Đang hoạt động', color: 'green' };
+                }
+
+                sendResponse({
+                    workStatus,
+                    timers: timers || {},
+                    settings,
+                    state: {
+                        focusEndTime: state.focusEndTime,
+                        pomodoroState: state.pomodoroState,
+                        pomodoroEndTime: state.pomodoroEndTime,
+                        pomodoroCount: state.pomodoroCount
+                    }
+                });
+            } catch(e) {
+                console.error('[getStatus] Fatal error:', e);
+                sendResponse({
+                    workStatus: { status: 'working', label: '🟢 Đang hoạt động', color: 'green' },
+                    timers: {},
+                    settings: DEFAULT_SETTINGS,
+                    state: {}
+                });
+            }
+        })();
         return true;
     }
 
@@ -1779,8 +1856,21 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Initialize on startup
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
+    console.log('[Startup] Initializing...');
+    // Đảm bảo timers luôn tồn tại
+    const data = await chrome.storage.local.get(['timers', 'settings']);
+    if (!data.timers) {
+        console.log('[Startup] No timers found, initializing...');
+        await resetAllTimers();
+    }
+    if (!data.settings) {
+        console.log('[Startup] No settings found, setting defaults...');
+        await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
+    }
+    await chrome.storage.local.set({ lastUpdate: Date.now() });
     setupAlarms();
+    console.log('[Startup] Done!');
 });
 
 // ========================================
