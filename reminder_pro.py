@@ -10,6 +10,15 @@ Tính năng mới:
 
 Giờ làm việc: 8:00 - 17:30
 Nghỉ trưa: 11:30 - 13:00
+
+Scientific References:
+- AAO 20-20-20 rule (American Academy of Ophthalmology)
+- Columbia University: 5-min walk every 30 min
+- WHO hydration: drink water every 45-60 min
+- Cornell 20-8-2 rule for posture
+- Dry eye research: blink reminder every 15 min
+- Mindfulness research: breathing exercise every 60 min
+- AAO eye exercise: every 60 min
 """
 
 import subprocess
@@ -44,18 +53,18 @@ class ReminderInterval:
     """Cấu hình khoảng thời gian nhắc nhở (phút) - Based on scientific recommendations"""
     # Cơ bản
     walk: int = 30           # Columbia University: 5-min walk every 30 min
-    water: int = 30          # Hydration experts: drink regularly every 20-30 min
-    toilet: int = 60
+    water: int = 45          # WHO hydration: drink water every 45-60 min (updated from 30)
+    # toilet removed - no scientific basis for scheduled toilet reminders
 
     # Bảo vệ mắt
     eye_20_20_20: int = 20   # AAO 20-20-20 rule: every 20 min
-    blink: int = 2           # Research: blink reminder every 1-2 min during screen use
+    blink: int = 15          # Dry eye research: blink reminder every 15 min (updated from 2)
 
     # Bài tập & Tư thế
     posture: int = 20        # Cornell 20-8-2 rule: check posture every 20 min
     neck_stretch: int = 30   # Ergonomics: stretch every 20-30 min
-    eye_exercise: int = 90
-    breathing: int = 120
+    eye_exercise: int = 60   # AAO: eye exercise every 60 min (updated from 90)
+    breathing: int = 60      # Mindfulness research: every 60 min (updated from 120)
 
 
 # Khởi tạo config
@@ -73,7 +82,6 @@ class ReminderTracker:
     # Cơ bản
     last_walk: Optional[datetime] = None
     last_water: Optional[datetime] = None
-    last_toilet: Optional[datetime] = None
     
     # Bảo vệ mắt
     last_eye_20_20_20: Optional[datetime] = None
@@ -91,7 +99,6 @@ class ReminderTracker:
         now = datetime.now()
         self.last_walk = now
         self.last_water = now
-        self.last_toilet = now
         self.last_eye_20_20_20 = now
         self.last_blink = now
         self.last_posture = now
@@ -120,7 +127,6 @@ def send_notification(title: str, message: str, sound: bool = True):
 
 def send_detailed_notification(title: str, content: str):
     """Hiển thị dialog với nội dung chi tiết (bài tập)"""
-    # Escape special characters
     content_escaped = content.replace('"', '\\"').replace('\n', '\\n')
     
     script = f'''
@@ -274,7 +280,7 @@ def check_basic_reminders():
     
     now = datetime.now()
     
-    # Đứng dậy đi bộ (30 phút)
+    # Đứng dậy đi bộ (30 phút) - Columbia University
     if minutes_since(tracker.last_walk) >= INTERVALS.walk:
         send_notification(
             "🚶 Đứng dậy đi bộ!", 
@@ -283,7 +289,7 @@ def check_basic_reminders():
         )
         tracker.last_walk = now
     
-    # Uống nước (45 phút)
+    # Uống nước (45 phút) - WHO hydration guidelines
     if minutes_since(tracker.last_water) >= INTERVALS.water:
         send_notification(
             "💧 Uống nước!", 
@@ -291,15 +297,8 @@ def check_basic_reminders():
             sound=True
         )
         tracker.last_water = now
-    
-    # Đi toilet (60 phút)
-    if minutes_since(tracker.last_toilet) >= INTERVALS.toilet:
-        send_notification(
-            "🚽 Đi toilet!", 
-            "Đã 1 tiếng rồi! Đi toilet một chút nhé!",
-            sound=True
-        )
-        tracker.last_toilet = now
+
+    # Note: toilet reminder removed - no scientific basis for scheduled toilet reminders
 
 
 def check_eye_protection():
@@ -311,7 +310,7 @@ def check_eye_protection():
     
     now = datetime.now()
     
-    # 20-20-20 Rule (20 phút)
+    # 20-20-20 Rule (20 phút) - AAO
     if minutes_since(tracker.last_eye_20_20_20) >= INTERVALS.eye_20_20_20:
         send_notification(
             "👁️ Quy tắc 20-20-20!", 
@@ -320,7 +319,7 @@ def check_eye_protection():
         )
         tracker.last_eye_20_20_20 = now
     
-    # Nhắc chớp mắt (15 phút)
+    # Nhắc chớp mắt (15 phút) - Dry eye research
     if minutes_since(tracker.last_blink) >= INTERVALS.blink:
         send_notification(
             "😊 Chớp mắt!", 
@@ -339,7 +338,7 @@ def check_exercise_reminders():
     
     now = datetime.now()
     
-    # Tư thế ngồi (45 phút)
+    # Tư thế ngồi (20 phút) - Cornell 20-8-2
     if minutes_since(tracker.last_posture) >= INTERVALS.posture:
         send_detailed_notification(
             "🪑 Kiểm tra tư thế ngồi",
@@ -347,7 +346,7 @@ def check_exercise_reminders():
         )
         tracker.last_posture = now
     
-    # Giãn cơ cổ vai (60 phút)
+    # Giãn cơ cổ vai (30 phút) - Ergonomics
     if minutes_since(tracker.last_neck_stretch) >= INTERVALS.neck_stretch:
         send_detailed_notification(
             "🧘 Giãn cơ cổ vai",
@@ -355,7 +354,7 @@ def check_exercise_reminders():
         )
         tracker.last_neck_stretch = now
     
-    # Bài tập mắt (90 phút)  
+    # Bài tập mắt (60 phút) - AAO guidelines
     if minutes_since(tracker.last_eye_exercise) >= INTERVALS.eye_exercise:
         send_detailed_notification(
             "👁️ Bài tập mắt",
@@ -363,7 +362,7 @@ def check_exercise_reminders():
         )
         tracker.last_eye_exercise = now
     
-    # Hít thở (120 phút)
+    # Hít thở (60 phút) - Mindfulness research
     if minutes_since(tracker.last_breathing) >= INTERVALS.breathing:
         send_detailed_notification(
             "🌬️ Hít thở sâu",
@@ -378,8 +377,6 @@ def check_exercise_reminders():
 
 def get_next_reminders() -> dict:
     """Lấy thời gian đến các nhắc nhở tiếp theo"""
-    now = datetime.now()
-    
     reminders = {}
     
     if tracker.last_walk:
@@ -420,21 +417,25 @@ def print_banner():
     """In banner khởi động"""
     print("""
 ╔══════════════════════════════════════════════════════════════════╗
-║        🏃 WORK HEALTH REMINDER PRO - Nhắc nhở sức khỏe 2.0       ║
+║      🏃 WORK HEALTH REMINDER PRO - Nhắc nhở sức khỏe 2.1         ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  Giờ làm việc: 8:00 - 17:30  |  Nghỉ trưa: 11:30 - 13:00         ║
 ╠══════════════════════════════════════════════════════════════════╣
-║  📅 Nhắc nhở cơ bản:                                             ║
-║  • 30 phút → Đi bộ 🚶   • 45 phút → Uống nước 💧                 ║
-║  • 60 phút → Toilet 🚽  • 11:30/17:30 → Ăn/Về 🍚🏠               ║
+║  📅 Nhắc nhở cơ bản (dựa trên nghiên cứu khoa học):              ║
+║  • 30 phút → Đi bộ 🚶 (Columbia Univ.)                           ║
+║  • 45 phút → Uống nước 💧 (WHO guideline)                         ║
+║  • 11:30/17:30 → Ăn/Về 🍚🏠                                       ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║  👁️ Bảo vệ mắt:                                                  ║
-║  • 20 phút → 20-20-20  • 15 phút → Chớp mắt 😊                   ║
+║  • 20 phút → 20-20-20 rule (AAO)                                  ║
+║  • 15 phút → Nhắc chớp mắt (Dry eye research)                     ║
 ║  • 18:00 → Night mode 🌙                                         ║
 ╠══════════════════════════════════════════════════════════════════╣
-║  🧘 Bài tập:                                                     ║
-║  • 45 phút → Tư thế 🪑  • 60 phút → Giãn cổ vai 💆               ║
-║  • 90 phút → Bài tập mắt 👀  • 120 phút → Hít thở 🌬️             ║
+║  🧘 Bài tập (tối ưu theo khoa học):                              ║
+║  • 20 phút → Tư thế 🪑 (Cornell 20-8-2)                           ║
+║  • 30 phút → Giãn cổ vai 💆                                       ║
+║  • 60 phút → Bài tập mắt 👀 (AAO)                                 ║
+║  • 60 phút → Hít thở 🌬️ (Mindfulness research)                    ║
 ╚══════════════════════════════════════════════════════════════════╝
     """)
 
