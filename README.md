@@ -238,8 +238,20 @@ Hoạt động trên cả **macOS và Windows**, không cần cài Python.
 
 ## ❓ Câu hỏi thường gặp
 
-**Q: Double-click `Start_macOS.command` không mở được?**  
-→ Right-click → **Open** → chọn Open một lần nữa là được (macOS security)
+**Q: Double-click `Start_macOS.command` không mở được / bị chặn?**  
+macOS tự động block file tải từ internet. Có 2 cách fix:
+
+**Cách 1 — Không cần Terminal (dễ nhất):**  
+Right-click vào file → chọn **Open** → hỏi lại → bấm **Open** lần nữa → xong ✅  
+Lần sau double-click bình thường được rồi.
+
+**Cách 2 — Dùng Terminal (1 lần duy nhất):**
+```bash
+# Cấp quyền thực thi + xóa flag quarantine
+chmod +x Start_macOS.command
+xattr -d com.apple.quarantine Start_macOS.command
+```
+Sau đó double-click bình thường, không bị hỏi nữa.
 
 **Q: App không gửi notification trên macOS?**  
 → System Settings → Notifications → Terminal (hoặc Python) → Bật Allow Notifications
