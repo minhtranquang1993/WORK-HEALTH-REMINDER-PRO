@@ -510,6 +510,30 @@
                 </div>
             </div>
 
+            <!-- Calendar ICS Settings -->
+            <div class="settings-group">
+                <h3 class="section-title">📅 Google Calendar (ICS)</h3>
+                <p class="section-desc">Tự động dừng nhắc nhở khi đang họp. Không cần đăng nhập.</p>
+                <div class="setting-item">
+                    <label>ICS URL</label>
+                    <input type="text" id="settingIcsUrl" placeholder="https://calendar.google.com/calendar/ical/...">
+                </div>
+                <div class="setting-item setting-item-inline">
+                    <label>Giờ báo cáo</label>
+                    <input type="time" id="settingCalendarSync" value="00:30">
+                    <span class="setting-hint">Sync mỗi 30 phút tự động</span>
+                </div>
+                <div class="calendar-status" id="calendarStatus">⚙️ Chưa cấu hình</div>
+                <div class="calendar-actions">
+                    <button class="settings-btn" id="btnCalendarSync">🔄 Sync ngay</button>
+                    <button class="settings-btn" id="btnCalendarTest">✅ Test</button>
+                </div>
+                <div class="calendar-howto">
+                    <strong>Cách lấy ICS URL:</strong><br>
+                    Google Calendar → ⚙️ Settings → Chọn lịch → <em>"Secret address in iCal format"</em> → Copy link
+                </div>
+            </div>
+
             <!-- Telegram Settings -->
             <div class="settings-group">
                 <h3 class="section-title">📱 Telegram Integration</h3>
