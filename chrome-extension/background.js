@@ -871,6 +871,8 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[onMessage]', message.action);
+
     // Calendar ICS handlers
     if (message.action === 'syncCalendar') {
         syncCalendar().then(result => sendResponse(result));
@@ -939,7 +941,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'getStatus') {
         (async () => {
             try {
+                console.log('[getStatus] Starting...');
                 const data = await chrome.storage.local.get(['settings', 'timers', 'lastUpdate', 'state']);
+                console.log('[getStatus] Storage loaded. settings:', !!data.settings, 'timers:', !!data.timers);
                 const settings = data.settings || DEFAULT_SETTINGS;
                 let timers = data.timers;
 
@@ -980,7 +984,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     workStatus = { status: 'working', label: '🟢 Đang hoạt động', color: 'green' };
                 }
 
-                sendResponse({
+                const response = {
                     workStatus,
                     timers: timers || {},
                     settings,
@@ -990,7 +994,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         pomodoroEndTime: state.pomodoroEndTime,
                         pomodoroCount: state.pomodoroCount
                     }
-                });
+                };
+                console.log('[getStatus] Sending response:', workStatus);
+                sendResponse(response);
             } catch(e) {
                 console.error('[getStatus] Fatal error:', e);
                 sendResponse({
