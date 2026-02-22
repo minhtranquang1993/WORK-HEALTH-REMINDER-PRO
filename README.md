@@ -8,10 +8,11 @@
 ## 📋 Mục lục
 
 - [Tính năng](#-tính-năng)
-- [Cài đặt](#-cài-đặt)
+- [Cài đặt & Chạy app](#-cài-đặt--chạy-app)
 - [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
 - [Cài đặt Telegram](#-cài-đặt-telegram-nhận-báo-cáo-todo)
 - [Cài đặt Google Calendar](#-cài-đặt-google-calendar-tự-dừng-khi-họp)
+- [Chrome Extension](#-chrome-extension)
 - [Câu hỏi thường gặp](#-câu-hỏi-thường-gặp)
 
 ---
@@ -37,62 +38,65 @@
 - Progress bar hiển thị % đã đạt
 - Tự động reset mỗi ngày mới
 
-### 📅 Tự động dừng khi họp (Google Calendar / ICS)
+### 🎯 Focus Mode *(mới)*
+- Tắt toàn bộ nhắc nhở trong 15 / 30 / 45 / 60 phút
+- Tự động bật lại sau khi hết giờ focus
+
+### 🏖️ Chế độ nghỉ phép *(mới)*
+- Đặt ngày bắt đầu & kết thúc nghỉ → app tự dừng hoàn toàn
+- Phù hợp khi đi công tác, nghỉ phép dài ngày
+
+### 🎌 Ngày lễ *(mới)*
+- Tích hợp sẵn lịch nghỉ lễ Việt Nam 2025–2026
+- Tự thêm ngày nghỉ tùy chỉnh (công ty, cá nhân)
+- App tự dừng vào ngày lễ, không cần tắt thủ công
+
+### 📅 Tự động dừng khi họp (ICS Calendar)
 - Kết nối lịch qua ICS URL — không cần đăng nhập
 - Tự động dừng nhắc nhở khi đang trong meeting
 - Hỗ trợ Google Calendar, Outlook, Apple Calendar
+
+### 📝 Todo & Báo cáo Telegram *(mới)*
+- Quản lý task trong ngày (Chrome Extension)
+- Tự động gửi báo cáo tổng kết cuối ngày qua Telegram
 
 ### 🍅 Pomodoro Timer
 - Chế độ tập trung 25 phút / nghỉ 5 phút
 - Tự động đếm số Pomodoro hoàn thành trong ngày
 
-### 📝 Todo & Báo cáo Telegram
-- Quản lý task trong ngày
-- Tự động gửi báo cáo cuối ngày qua Telegram
+---
 
-### 🎯 Focus Mode
-- Tạm dừng toàn bộ nhắc nhở trong X phút (15/30/45/60 phút)
+## 🚀 Cài đặt & Chạy app
+
+### ✅ Cách đơn giản nhất — Double-click (không cần biết code)
+
+**macOS:**
+1. Tải source code về → giải nén
+2. Double-click file **`Start_macOS.command`**
+3. App tự cài thư viện nếu cần → icon 🏃 xuất hiện trên menu bar
+
+> Lần đầu chạy macOS có thể hỏi permission → click **Open** là được
+
+**Windows:**
+1. Tải source code về → giải nén
+2. Double-click file **`Start_Windows.bat`**
+3. App tự cài thư viện nếu cần → chạy trong Terminal
 
 ---
 
-## 🚀 Cài đặt
+### 🔧 Cách thủ công (cho người dùng Terminal)
 
-### Yêu cầu
-
-- **Python 3.6+**
-- **macOS** hoặc **Windows 10/11**
-
-### Bước 1 — Tải source code
-
-```bash
-git clone https://github.com/minhtranquang1993/WORK-HEALTH-REMINDER-PRO.git
-cd WORK-HEALTH-REMINDER-PRO
-```
-
-> Hoặc tải file ZIP → Giải nén → Mở thư mục vừa giải nén
-
-### Bước 2 — Cài thư viện
+**Yêu cầu:** Python 3.6+
 
 **macOS:**
 ```bash
 pip3 install rumps
+python3 menubar_app.py
 ```
 
 **Windows:**
 ```bash
 pip install win10toast
-```
-
-### Bước 3 — Chạy app
-
-**macOS (Menu Bar — khuyên dùng):**
-```bash
-python3 menubar_app.py
-```
-→ Icon 🏃 sẽ xuất hiện trên thanh menu phía trên góc phải màn hình.
-
-**Windows (Terminal):**
-```bash
 python reminder_pro.py
 ```
 
@@ -109,50 +113,34 @@ Sau khi chạy, click vào icon 🏃 trên menu bar để mở:
 ├── 🟢 Đang làm việc
 ├── ⏱️ Nhắc tiếp: 💧 Nước — 12 phút
 │
-├── ⏸️ Tạm dừng          ← Dừng tất cả nhắc nhở
-├── 🎯 Focus Mode         ← Tập trung không bị làm phiền
+├── ⏸️ Tạm dừng
+├── 🎯 Focus Mode          ← Tắt nhắc nhở 15/30/45/60 phút
 ├── 🍅 Pomodoro
 │
-├── 💧 Nước: 600/2000ml   ← Water Tracker
+├── 💧 Nước: 600/2000ml    ← Water Tracker
 │   ├── ✅ Uống 200ml
 │   ├── ✏️ Uống lượng khác...
 │   └── 🔄 Reset hôm nay
 │
-├── 📅 Calendar           ← Kết nối lịch họp
+├── 📅 Calendar             ← Kết nối lịch họp (ICS)
+├── 🏖️ Chế độ nghỉ phép    ← Tạm dừng khi nghỉ/công tác
+├── 🎌 Ngày lễ             ← Lịch lễ VN + ngày nghỉ tùy chỉnh
+├── 📱 Telegram            ← Nhận báo cáo Todo cuối ngày
 ├── 📺 YouTube
 ├── 💪 Bài tập ngay
-├── ⚡ Thao tác nhanh
 │
 └── ⚙️ Cài đặt
     ├── 📅 Giờ làm việc
-    ├── ⏱️ Thời gian nhắc  ← Tùy chỉnh chu kỳ
-    ├── 💧 Cài đặt nước    ← Mục tiêu & kích thước ly
+    ├── ⏱️ Thời gian nhắc   ← Tùy chỉnh chu kỳ
+    ├── 💧 Cài đặt nước     ← Mục tiêu & kích thước ly
     └── 🔄 Đặt lại mặc định
 ```
-
-### Chrome Extension
-
-1. Mở Chrome → vào `chrome://extensions/`
-2. Bật **Developer mode** (góc trên phải)
-3. Bấm **Load unpacked** → chọn thư mục `chrome-extension/`
-4. Icon extension xuất hiện trên thanh công cụ Chrome
-5. Click vào icon để mở popup
-
-**Các tab trong extension:**
-
-| Tab | Chức năng |
-|-----|-----------|
-| ⏱️ Timer | Xem countdown các nhắc nhở + Water Tracker |
-| 📝 Todo | Quản lý task trong ngày |
-| 🎯 Focus | Focus Mode + Pomodoro |
-| 📺 YouTube | Điều khiển YouTube đang phát |
-| ⚙️ Settings | Cài đặt giờ làm, Telegram, Water goal... |
 
 ---
 
 ## 📱 Cài đặt Telegram (Nhận báo cáo Todo)
 
-Tính năng này giúp app gửi báo cáo tổng kết cuối ngày vào Telegram của bạn.
+Tính năng này gửi báo cáo tổng kết Todo cuối ngày vào Telegram của bạn.
 
 ### Bước 1 — Tạo Bot Telegram
 
@@ -161,16 +149,20 @@ Tính năng này giúp app gửi báo cáo tổng kết cuối ngày vào Telegr
 3. Đặt tên bot (ví dụ: `My Health Bot`)
 4. Copy **Bot Token** (dạng `123456789:AAHxx...`)
 
-### Bước 2 — Lấy Chat ID
+### Bước 2 — Lấy Chat ID của bạn
 
 1. Mở Telegram → tìm **@userinfobot**
 2. Gửi bất kỳ tin nhắn nào
-3. Bot sẽ trả về **ID** của bạn (ví dụ: `123456789`)
+3. Bot trả về **ID** của bạn (ví dụ: `123456789`)
 
-### Bước 3 — Nhập vào Settings
+### Bước 3 — Nhập vào app
+
+**macOS Menu Bar:**
+> Click 🏃 → 📱 Telegram → 🔑 Cài đặt Bot Token → Nhập token + chat ID → OK  
+> Bấm **📢 Test gửi tin nhắn** để kiểm tra
 
 **Chrome Extension:**
-> ⚙️ Settings → 📱 Telegram Integration → Nhập Bot Token + Chat ID → Bấm **Test thông báo** → Save
+> ⚙️ Settings → 📱 Telegram Integration → Nhập Bot Token + Chat ID → **Test thông báo** → Save
 
 ---
 
@@ -182,26 +174,43 @@ Không cần đăng nhập, chỉ cần copy 1 link ICS.
 
 **Google Calendar:**
 1. Vào [calendar.google.com](https://calendar.google.com)
-2. Click ⚙️ (góc trên phải) → **Settings**
-3. Chọn lịch muốn dùng (ví dụ: lịch cá nhân)
-4. Kéo xuống phần **"Secret address in iCal format"**
-5. Copy link (dạng `https://calendar.google.com/calendar/ical/...`)
+2. Click ⚙️ → **Settings**
+3. Chọn lịch → kéo xuống **"Secret address in iCal format"**
+4. Copy link
 
-**Outlook:**
-> Calendar → Share → Get a link → Copy ICS link
+**Outlook:** Calendar → Share → Get a link → ICS  
+**Apple Calendar:** Right-click tên lịch → Share Calendar → Copy Link
 
-**Apple Calendar:**
-> Right-click tên lịch → Share Calendar → Copy Link
+### Nhập vào app
 
-### Nhập vào App
+**macOS:**
+> Click 🏃 → 📅 Calendar → 🔗 Nhập ICS URL → Paste → OK
 
-**macOS Menu Bar:**
-> Click icon 🏃 → 📅 Calendar → 🔗 Nhập ICS URL → Paste link → OK
+**Chrome Extension:**
+> ⚙️ Settings → 📅 Google Calendar (ICS) → Paste URL → Tự động sync
 
-App sẽ tự động:
-- ⏸️ Dừng nhắc nhở khi bạn đang trong meeting
-- ▶️ Resume lại sau khi meeting kết thúc
-- 🔄 Sync lịch mỗi 30 phút (cache local — offline vẫn hoạt động)
+---
+
+## 🌐 Chrome Extension
+
+Hoạt động trên cả **macOS và Windows**, không cần cài Python.
+
+### Cài đặt
+
+1. Mở Chrome → vào `chrome://extensions/`
+2. Bật **Developer mode** (góc trên phải)
+3. Bấm **Load unpacked** → chọn thư mục `chrome-extension/`
+4. Icon xuất hiện trên thanh công cụ Chrome ✅
+
+### Các tab trong Extension
+
+| Tab | Chức năng |
+|-----|-----------|
+| ⏱️ Timer | Countdown nhắc nhở + 💧 Water Tracker |
+| 📝 Todo | Quản lý task trong ngày |
+| 🎯 Focus | Focus Mode + Pomodoro |
+| 📺 YouTube | Điều khiển YouTube đang phát |
+| ⚙️ Settings | Giờ làm, Telegram, Water goal, Calendar ICS... |
 
 ---
 
@@ -209,52 +218,43 @@ App sẽ tự động:
 
 ### Chỉnh chu kỳ nhắc nhở
 
-**macOS:** Click ⚙️ → ⏱️ Thời gian nhắc → Chỉnh từng mục
-
+**macOS:** ⚙️ Cài đặt → ⏱️ Thời gian nhắc → Chỉnh từng mục  
 **Chrome Extension:** ⚙️ Settings → Intervals
-
-**Hoặc sửa trực tiếp trong code** (`menubar_app.py`):
-```python
-INTERVALS = ReminderInterval(
-    walk=30,         # Đi bộ (phút)
-    water=45,        # Uống nước (phút)
-    eye_20_20_20=20, # 20-20-20 rule (phút)
-    blink=15,        # Chớp mắt (phút)
-    posture=20,      # Tư thế (phút)
-    neck_stretch=30, # Giãn cổ vai (phút)
-    eye_exercise=60, # Bài tập mắt (phút)
-    breathing=60     # Hít thở (phút)
-)
-```
-
-### Chỉnh giờ làm việc
-
-**macOS:** Click ⚙️ → 📅 Giờ làm việc → Sửa giờ bắt đầu/kết thúc
 
 ### Chỉnh mục tiêu nước
 
-**macOS:** Click ⚙️ → 💧 Cài đặt nước → Sửa mục tiêu (ml) và kích thước ly
-
+**macOS:** ⚙️ Cài đặt → 💧 Cài đặt nước → Sửa mục tiêu + kích thước ly  
 **Chrome Extension:** ⚙️ Settings → 💧 Water Tracker
+
+### Thêm ngày nghỉ tùy chỉnh
+
+**macOS:** Click 🏃 → 🎌 Ngày lễ → ➕ Thêm ngày nghỉ → Nhập tên + ngày bắt đầu/kết thúc
+
+### Đặt nghỉ phép / công tác
+
+**macOS:** Click 🏃 → 🏖️ Chế độ nghỉ phép → 📅 Đặt ngày nghỉ → Nhập ngày
 
 ---
 
 ## ❓ Câu hỏi thường gặp
 
+**Q: Double-click `Start_macOS.command` không mở được?**  
+→ Right-click → **Open** → chọn Open một lần nữa là được (macOS security)
+
 **Q: App không gửi notification trên macOS?**  
-→ Vào **System Settings > Notifications > Terminal** (hoặc Python) → Bật Allow Notifications
+→ System Settings → Notifications → Terminal (hoặc Python) → Bật Allow Notifications
 
 **Q: Chạy app tự động khi bật máy (macOS)?**  
-→ System Settings → General → Login Items → Thêm script vào danh sách
+→ System Settings → General → Login Items → Thêm `Start_macOS.command`
 
 **Q: Chrome Extension không load được?**  
 → Đảm bảo đã bật **Developer mode** trong `chrome://extensions/`
 
 **Q: ICS URL không sync được?**  
-→ Kiểm tra lại URL có bắt đầu bằng `https://` không, và máy có kết nối internet không
+→ Kiểm tra URL bắt đầu bằng `https://` và máy đang có internet
 
 **Q: Muốn dùng trên cả Mac lẫn Windows?**  
-→ Dùng **Chrome Extension** — hoạt động trên cả 2 platform, không cần cài thêm gì
+→ Dùng **Chrome Extension** — không cần cài Python, chạy được trên cả 2
 
 ---
 
@@ -262,23 +262,27 @@ INTERVALS = ReminderInterval(
 
 ```
 WORK-HEALTH-REMINDER-PRO/
-├── menubar_app.py          # 🖥️  macOS Menu Bar App (khuyên dùng)
-├── reminder_pro.py         # 💻  Terminal PRO version
-├── reminder.py             # 📝  Terminal cơ bản
-├── reminder_gui.py         # 🪟  GUI version
-├── exercises.py            # 💪  Module bài tập
-├── water_tracker.py        # 💧  Water Tracker module
-├── calendar_sync.py        # 📅  ICS Calendar Sync module
 │
-├── chrome-extension/       # 🌐  Chrome Extension
+├── 🖱️  Start_macOS.command    ← Double-click để chạy (macOS)
+├── 🖱️  Start_Windows.bat      ← Double-click để chạy (Windows)
+│
+├── menubar_app.py             ← macOS Menu Bar App (khuyên dùng)
+├── reminder_pro.py            ← Terminal PRO version
+├── reminder.py                ← Terminal cơ bản
+├── reminder_gui.py            ← GUI version
+├── exercises.py               ← Module bài tập
+├── water_tracker.py           ← Water Tracker module
+├── calendar_sync.py           ← ICS Calendar Sync module
+│
+├── chrome-extension/          ← Chrome Extension (macOS + Windows)
 │   ├── manifest.json
-│   ├── popup.html          #     Giao diện popup
-│   ├── popup.js            #     Logic popup
-│   ├── popup.css           #     Style
-│   ├── background.js       #     Service worker (timers, alarms)
+│   ├── popup.html
+│   ├── popup.js
+│   ├── popup.css
+│   ├── background.js
 │   └── icons/
 │
-├── index.html              # 🌍  Web version (mở bằng browser)
+├── index.html                 ← Web version (mở bằng browser)
 ├── app.js
 ├── styles.css
 └── README.md
@@ -289,4 +293,4 @@ WORK-HEALTH-REMINDER-PRO/
 ## 🙏 Credits
 
 Built with ❤️ for productivity and health.  
-Dựa trên các nghiên cứu của Columbia University, WHO, AAO, Cornell University.
+Dựa trên nghiên cứu của Columbia University, WHO, AAO, Cornell University.
