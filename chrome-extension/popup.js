@@ -10,6 +10,7 @@ class PopupController {
         this.loadSettings();
         this.loadTodoData();
         this.loadHolidays();
+        this.loadWaterData();
         this.startUpdating();
     }
 
@@ -81,6 +82,17 @@ class PopupController {
         this.btnSaveSettings = document.getElementById('btnSaveSettings');
         this.btnResetSettings = document.getElementById('btnResetSettings');
         this.btnTestTelegram = document.getElementById('btnTestTelegram');
+
+        // Water Tracker
+        this.waterAmount = document.getElementById('waterAmount');
+        this.waterProgressFill = document.getElementById('waterProgressFill');
+        this.waterPct = document.getElementById('waterPct');
+        this.btnWater200 = document.getElementById('btnWater200');
+        this.btnWater300 = document.getElementById('btnWater300');
+        this.btnWater500 = document.getElementById('btnWater500');
+        this.btnWaterReset = document.getElementById('btnWaterReset');
+        this.settingWaterGoal = document.getElementById('settingWaterGoal');
+        this.settingWaterCup = document.getElementById('settingWaterCup');
 
         // Exercise panel
         this.exercisePanel = document.getElementById('exercisePanel');
@@ -201,6 +213,12 @@ class PopupController {
         this.btnSaveSettings.addEventListener('click', () => this.saveSettings());
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
         this.btnTestTelegram.addEventListener('click', () => this.testTelegram());
+
+        // Water Tracker
+        this.btnWater200?.addEventListener('click', () => this.addWater(200));
+        this.btnWater300?.addEventListener('click', () => this.addWater(300));
+        this.btnWater500?.addEventListener('click', () => this.addWater(500));
+        this.btnWaterReset?.addEventListener('click', () => this.resetWater());
 
         // YouTube controls
         if (this.btnOpenYoutube) {
@@ -522,6 +540,40 @@ class PopupController {
         } catch (e) {
             console.log('Error stopping pomodoro:', e);
         }
+    }
+
+    // ============================================
+    // WATER TRACKER
+    // ============================================
+
+    async addWater(ml) {
+        const response = await chrome.runtime.sendMessage({ action: 'addWater', ml });
+        if (response?.log) this.updateWaterUI(response.log);
+    }
+
+    async resetWater() {
+        const response = await chrome.runtime.sendMessage({ action: 'resetWater' });
+        if (response?.log) this.updateWaterUI(response.log);
+    }
+
+    updateWaterUI(log) {
+        if (!log) return;
+        const goal = log.goalMl || 2000;
+        const total = log.totalMl || 0;
+        const pct = Math.min(100, Math.round(total * 100 / goal));
+
+        if (this.waterAmount) this.waterAmount.textContent = `${total} / ${goal}ml`;
+        if (this.waterProgressFill) this.waterProgressFill.style.width = `${pct}%`;
+        if (this.waterPct) this.waterPct.textContent = `${pct}%`;
+
+        // Đổi màu progress bar theo %
+        const color = pct >= 100 ? '#2196F3' : pct >= 60 ? '#4CAF50' : pct >= 30 ? '#FF9800' : '#f44336';
+        if (this.waterProgressFill) this.waterProgressFill.style.background = color;
+    }
+
+    async loadWaterData() {
+        const response = await chrome.runtime.sendMessage({ action: 'getWaterLog' });
+        if (response?.log) this.updateWaterUI(response.log);
     }
 
     async testTelegram() {
@@ -1087,6 +1139,10 @@ class PopupController {
                 // Notification
                 this.settingNotification.checked = s.notificationEnabled !== false;
 
+                // Water
+                if (this.settingWaterGoal) this.settingWaterGoal.value = s.waterGoalMl || 2000;
+                if (this.settingWaterCup) this.settingWaterCup.value = s.waterCupMl || 200;
+
                 // Telegram
                 this.settingTelegramToken.value = s.telegramBotToken || '';
                 this.settingTelegramChatId.value = s.telegramChatId || '';
@@ -1150,6 +1206,8 @@ class PopupController {
                 sleepReminderTime: this.parseTimeValue(this.settingSleepTime.value),
                 nightModeStart: this.parseTimeValue(this.settingNightMode.value),
                 notificationEnabled: this.settingNotification.checked,
+                waterGoalMl: parseInt(this.settingWaterGoal?.value) || 2000,
+                waterCupMl: parseInt(this.settingWaterCup?.value) || 200,
                 telegramBotToken: this.settingTelegramToken.value.trim(),
                 telegramChatId: this.settingTelegramChatId.value.trim(),
                 telegramReportTime: this.parseTimeValue(this.settingTelegramTime.value),
