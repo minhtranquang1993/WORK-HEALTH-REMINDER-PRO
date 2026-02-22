@@ -33,18 +33,22 @@ const DEFAULT_SETTINGS = {
     pomodoroBreak: 5,
     pomodoroLongBreak: 15,
 
-    // Intervals (minutes) - Based on scientific recommendations (updated)
+    // Intervals (minutes) - Based on scientific recommendations
     intervals: {
         walk: 30,           // Columbia University: 5-min walk every 30 min
-        water: 45,          // WHO hydration: drink water every 45-60 min
-        toilet: 60,         // Optional - kept for users who want it
+        water: 30,          // Hydration experts: drink regularly every 20-30 min
+        toilet: 60,
         eye_20_20_20: 20,   // AAO 20-20-20 rule: every 20 min
-        blink: 15,          // Dry eye research: blink reminder every 15 min
+        blink: 2,           // Research: blink reminder every 1-2 min during screen use
         posture: 20,        // Cornell 20-8-2 rule: check posture every 20 min
         neck_stretch: 30,   // Ergonomics: stretch every 20-30 min
-        eye_exercise: 60,   // AAO: eye exercise every 60 min
-        breathing: 60       // Mindfulness research: breathing exercise every 60 min
+        eye_exercise: 90,
+        breathing: 120
     },
+
+    // Water Tracker
+    waterGoalMl: 2000,
+    waterCupMl: 200,
 
     // Toggles
     soundEnabled: true,
@@ -825,6 +829,30 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Water Tracker handlers
+    if (message.action === 'getWaterLog') {
+        getWaterLog().then(log => sendResponse({ log }));
+        return true;
+    }
+    if (message.action === 'addWater') {
+        addWater(message.ml).then(log => {
+            // Notification khi đạt mục tiêu
+            getSettings().then(settings => {
+                const goal = settings.waterGoalMl || 2000;
+                const pct = Math.round(log.totalMl * 100 / goal);
+                if (pct >= 100 && (log.totalMl - message.ml) < goal) {
+                    showCustomNotification('🎉 Đạt mục tiêu nước!', `Đã uống đủ ${goal}ml hôm nay! Tuyệt vời!`);
+                }
+            });
+            sendResponse({ log });
+        });
+        return true;
+    }
+    if (message.action === 'resetWater') {
+        resetWaterToday().then(log => sendResponse({ log }));
+        return true;
+    }
+
     // Handle YouTube state updates from content script
     if (message.action === 'youtubeStateUpdate') {
         const tabId = sender.tab?.id;
@@ -1053,6 +1081,41 @@ async function ensureTodoToday() {
 }
 
 // Perform daily reset for Todo
+// ============================================
+// WATER TRACKER
+// ============================================
+
+async function getWaterLog() {
+    const today = new Date().toDateString();
+    const data = await chrome.storage.local.get(['waterLog']);
+    const log = data.waterLog || {};
+    // Reset nếu sang ngày mới
+    if (log.date !== today) {
+        const settings = await getSettings();
+        const newLog = { date: today, totalMl: 0, entries: [], goalMl: settings.waterGoalMl || 2000 };
+        await chrome.storage.local.set({ waterLog: newLog });
+        return newLog;
+    }
+    return log;
+}
+
+async function addWater(ml) {
+    const log = await getWaterLog();
+    log.totalMl = (log.totalMl || 0) + ml;
+    log.entries = log.entries || [];
+    log.entries.push({ time: new Date().toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}), ml });
+    await chrome.storage.local.set({ waterLog: log });
+    return log;
+}
+
+async function resetWaterToday() {
+    const settings = await getSettings();
+    const today = new Date().toDateString();
+    const newLog = { date: today, totalMl: 0, entries: [], goalMl: settings.waterGoalMl || 2000 };
+    await chrome.storage.local.set({ waterLog: newLog });
+    return newLog;
+}
+
 async function performTodoDailyReset() {
     const { todoTasks, todoHistory, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
     const today = new Date();
