@@ -33,17 +33,17 @@ const DEFAULT_SETTINGS = {
     pomodoroBreak: 5,
     pomodoroLongBreak: 15,
 
-    // Intervals (minutes) - Based on scientific recommendations
+    // Intervals (minutes) - Based on scientific recommendations (updated)
     intervals: {
         walk: 30,           // Columbia University: 5-min walk every 30 min
-        water: 30,          // Hydration experts: drink regularly every 20-30 min
-        toilet: 60,
+        water: 45,          // WHO hydration: drink water every 45-60 min
+        toilet: 60,         // Optional - kept for users who want it
         eye_20_20_20: 20,   // AAO 20-20-20 rule: every 20 min
-        blink: 2,           // Research: blink reminder every 1-2 min during screen use
+        blink: 15,          // Dry eye research: blink reminder every 15 min
         posture: 20,        // Cornell 20-8-2 rule: check posture every 20 min
         neck_stretch: 30,   // Ergonomics: stretch every 20-30 min
-        eye_exercise: 90,
-        breathing: 120
+        eye_exercise: 60,   // AAO: eye exercise every 60 min
+        breathing: 60       // Mindfulness research: breathing exercise every 60 min
     },
 
     // Toggles
