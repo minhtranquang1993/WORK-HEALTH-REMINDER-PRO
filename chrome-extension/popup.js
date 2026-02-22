@@ -1088,8 +1088,8 @@ class PopupController {
                 this.settingNotification.checked = s.notificationEnabled !== false;
 
                 // Telegram
-                this.settingTelegramToken.value = s.telegramBotToken || '8583787983:AAHlW0mGpe8erumz0peN1gtXU2X7BtK2Zes';
-                this.settingTelegramChatId.value = s.telegramChatId || '1661694132';
+                this.settingTelegramToken.value = s.telegramBotToken || '';
+                this.settingTelegramChatId.value = s.telegramChatId || '';
                 this.settingTelegramTime.value = this.formatTimeValue(s.telegramReportTime || { hour: 17, minute: 0 });
 
                 // Intervals
