@@ -1031,12 +1031,24 @@ class PopupController {
     async loadHolidays() {
         try {
             const response = await chrome.runtime.sendMessage({ action: 'getHolidays' });
-            if (response && response.success) {
-                this.renderFixedHolidays(response.fixedHolidays);
-                this.renderCustomHolidays(response.customHolidays);
+            if (response) {
+                // Render fixed holidays (dùng cả khi success=false để debug)
+                const fixed = response.fixedHolidays || [];
+                const custom = response.customHolidays || [];
+                this.renderFixedHolidays(fixed);
+                this.renderCustomHolidays(custom);
+
+                // Nếu chưa có data, show placeholder
+                if (fixed.length === 0) {
+                    const container = document.getElementById('fixedHolidayList');
+                    if (container) container.innerHTML = '<div class="holiday-empty">Đang tải lịch nghỉ lễ...</div>';
+                }
             }
         } catch (e) {
             console.log('Error loading holidays:', e);
+            // Fallback: show error state
+            const container = document.getElementById('fixedHolidayList');
+            if (container) container.innerHTML = '<div class="holiday-empty">⚠️ Không tải được lịch nghỉ lễ</div>';
         }
     }
 
