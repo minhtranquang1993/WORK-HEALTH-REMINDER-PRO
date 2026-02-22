@@ -50,6 +50,10 @@ const DEFAULT_SETTINGS = {
     waterGoalMl: 2000,
     waterCupMl: 200,
 
+    // Calendar ICS
+    calendarIcsUrl: '',
+    calendarEnabled: false,
+
     // Toggles
     soundEnabled: true,
     notificationEnabled: true,
@@ -616,6 +620,20 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     // Skip if paused
     if (settings.isPaused) return;
 
+    // Auto-pause nếu đang trong meeting (Calendar ICS)
+    if (settings.calendarEnabled && settings.calendarIcsUrl) {
+        const meeting = isInMeeting();
+        if (meeting) {
+            console.log(`[Calendar] Skipping - in meeting: ${meeting.summary}`);
+            return;
+        }
+        const upcoming = getUpcomingMeeting(3);
+        if (upcoming) {
+            console.log(`[Calendar] Skipping - meeting soon: ${upcoming.summary}`);
+            return;
+        }
+    }
+
     // Skip if focus mode or pomodoro active (except for fixed time reminders)
     const isFocusActive = state.focusEndTime && Date.now() < state.focusEndTime;
     const isPomodoroActive = state.pomodoroState !== null;
@@ -829,6 +847,31 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Calendar ICS handlers
+    if (message.action === 'syncCalendar') {
+        syncCalendar().then(result => sendResponse(result));
+        return true;
+    }
+    if (message.action === 'getCalendarStatus') {
+        const meeting = isInMeeting();
+        const upcoming = getUpcomingMeeting();
+        const status = calendarLastSync
+            ? `✅ Synced ${Math.round((Date.now() - calendarLastSync) / 60000)} phút trước · ${calendarEvents.length} events`
+            : calendarEvents.length ? `📦 Từ cache · ${calendarEvents.length} events` : '⚙️ Chưa sync';
+        sendResponse({ status, meeting, upcoming, lastSync: calendarLastSync?.toISOString() });
+        return true;
+    }
+    if (message.action === 'saveCalendarUrl') {
+        getSettings().then(async settings => {
+            settings.calendarIcsUrl = message.url;
+            settings.calendarEnabled = !!message.url;
+            await chrome.storage.local.set({ settings });
+            if (message.url) startCalendarSync();
+            sendResponse({ success: true });
+        });
+        return true;
+    }
+
     // Water Tracker handlers
     if (message.action === 'getWaterLog') {
         getWaterLog().then(log => sendResponse({ log }));
@@ -1081,6 +1124,138 @@ async function ensureTodoToday() {
 }
 
 // Perform daily reset for Todo
+// ============================================
+// CALENDAR ICS SYNC
+// ============================================
+
+// Cache events in memory
+let calendarEvents = [];
+let calendarLastSync = null;
+let calendarSyncInterval = null;
+
+function parseIcsDateTime(dtStr) {
+    if (!dtStr) return null;
+    try {
+        dtStr = dtStr.trim();
+        if (dtStr.includes('Z')) {
+            // UTC: 20260222T090000Z
+            const y = dtStr.slice(0,4), mo = dtStr.slice(4,6), d = dtStr.slice(6,8);
+            const h = dtStr.slice(9,11), mi = dtStr.slice(11,13), s = dtStr.slice(13,15);
+            return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
+        } else if (dtStr.includes('T')) {
+            // Local: 20260222T160000
+            const y = dtStr.slice(0,4), mo = dtStr.slice(4,6), d = dtStr.slice(6,8);
+            const h = dtStr.slice(9,11), mi = dtStr.slice(11,13), s = dtStr.slice(13,15);
+            return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
+        } else {
+            // All-day: 20260222
+            return new Date(`${dtStr.slice(0,4)}-${dtStr.slice(4,6)}-${dtStr.slice(6,8)}`);
+        }
+    } catch(e) { return null; }
+}
+
+function parseIcsContent(icsText) {
+    const events = [];
+    let current = null;
+    // Unfold lines (ICS: long lines start with space/tab)
+    const lines = icsText.replace(/
+ /g, '').replace(/
+	/g, '').split(/
+|
+|
+/);
+
+    for (const line of lines) {
+        if (line === 'BEGIN:VEVENT') {
+            current = { summary: '', start: null, end: null, isAllDay: false, status: 'CONFIRMED' };
+        } else if (line === 'END:VEVENT' && current) {
+            if (current.start) events.push(current);
+            current = null;
+        } else if (current) {
+            if (line.startsWith('SUMMARY')) {
+                current.summary = line.split(':').slice(1).join(':').trim();
+            } else if (line.startsWith('DTSTART')) {
+                const val = line.split(':').slice(1).join(':').trim();
+                if (!val.includes('T') && !val.includes('Z')) current.isAllDay = true;
+                current.start = parseIcsDateTime(val);
+            } else if (line.startsWith('DTEND')) {
+                current.end = parseIcsDateTime(line.split(':').slice(1).join(':').trim());
+            } else if (line.startsWith('STATUS')) {
+                current.status = line.split(':').slice(1).join(':').trim();
+            }
+        }
+    }
+    return events;
+}
+
+async function syncCalendar() {
+    const settings = await getSettings();
+    const url = settings.calendarIcsUrl;
+    if (!url) return;
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const text = await resp.text();
+        const now = new Date();
+        const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        calendarEvents = parseIcsContent(text).filter(e =>
+            e.start && e.start <= weekLater && e.status !== 'CANCELLED'
+        );
+        calendarLastSync = now;
+
+        // Lưu cache vào storage
+        await chrome.storage.local.set({
+            calendarCache: { synced: now.toISOString(), events: calendarEvents.map(e => ({
+                summary: e.summary,
+                start: e.start?.toISOString(),
+                end: e.end?.toISOString(),
+                isAllDay: e.isAllDay
+            }))}
+        });
+        console.log(`[Calendar] Synced ${calendarEvents.length} events`);
+        return { success: true, count: calendarEvents.length };
+    } catch(e) {
+        console.error('[Calendar] Sync error:', e.message);
+        return { success: false, error: e.message };
+    }
+}
+
+async function loadCalendarCache() {
+    const data = await chrome.storage.local.get('calendarCache');
+    if (data.calendarCache?.events) {
+        calendarEvents = data.calendarCache.events.map(e => ({
+            ...e,
+            start: e.start ? new Date(e.start) : null,
+            end: e.end ? new Date(e.end) : null,
+        }));
+    }
+}
+
+function isInMeeting() {
+    const now = new Date();
+    return calendarEvents.find(e => {
+        if (e.isAllDay) return false;
+        return e.start && e.end && e.start <= now && now <= e.end;
+    }) || null;
+}
+
+function getUpcomingMeeting(withinMinutes = 3) {
+    const now = new Date();
+    const soon = new Date(now.getTime() + withinMinutes * 60 * 1000);
+    return calendarEvents.find(e => {
+        if (e.isAllDay) return false;
+        return e.start && e.start >= now && e.start <= soon;
+    }) || null;
+}
+
+function startCalendarSync() {
+    if (calendarSyncInterval) clearInterval(calendarSyncInterval);
+    syncCalendar(); // Sync ngay
+    calendarSyncInterval = setInterval(syncCalendar, 30 * 60 * 1000); // Mỗi 30 phút
+}
+
 // ============================================
 // WATER TRACKER
 // ============================================
