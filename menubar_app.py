@@ -1646,12 +1646,42 @@ class HealthReminderApp(rumps.App):
                 self.update_holiday_menu()
 
     def holiday_list_cb(self, _):
+        today = datetime.now().date()
+        today_str = today.strftime('%Y-%m-%d')
+
+        # Lịch lễ VN cố định (chỉ hiện từ hôm nay trở đi)
+        upcoming_fixed = []
+        for h in VN_HOLIDAYS:
+            end = h.get('end', h.get('start', ''))
+            if end >= today_str:
+                name = h.get('name', '?')
+                start = h.get('start', '?')
+                upcoming_fixed.append(f"🇻🇳 {name}: {start} → {end}")
+
+        # Ngày nghỉ tùy chỉnh
         customs = CONFIG.custom_holidays or []
-        if not customs:
-            send_notification("🎌 Ngày nghỉ tùy chỉnh", "Chưa có ngày nghỉ nào được thêm.")
-            return
-        lines = [f"• {h.get('name','?')}: {h.get('start','?')} - {h.get('end','?')}" for h in customs]
-        send_notification("🎌 Danh sách ngày nghỉ", "\n".join(lines[:5]))
+        upcoming_custom = []
+        for h in customs:
+            end = h.get('end', h.get('start', ''))
+            if end >= today_str:
+                name = h.get('name', '?')
+                start = h.get('start', '?')
+                upcoming_custom.append(f"📌 {name}: {start} → {end}")
+
+        lines = []
+        if upcoming_fixed:
+            lines.append("── Lễ Việt Nam ──")
+            lines.extend(upcoming_fixed[:6])
+        if upcoming_custom:
+            lines.append("── Tùy chỉnh ──")
+            lines.extend(upcoming_custom[:4])
+
+        if not lines:
+            send_notification("🎌 Ngày nghỉ", "Không có ngày lễ nào sắp tới.")
+        else:
+            # macOS notification giới hạn text, nên gom ngắn
+            msg = "\n".join(lines[:8])
+            send_notification("🎌 Danh sách ngày nghỉ", msg)
 
     def update_holiday_menu(self):
         holiday = check_holiday(CONFIG.custom_holidays)
