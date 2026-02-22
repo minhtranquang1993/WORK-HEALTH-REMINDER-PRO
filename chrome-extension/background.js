@@ -89,14 +89,26 @@ let youtubeState = {
 const MENUBAR_HTTP_PORT = 9876;
 
 // Vietnamese holidays 2026 (fixed)
-const HOLIDAYS_2026 = [
-    { name: "Tết Dương lịch", start: "2026-01-01", end: "2026-01-01" },
-    { name: "Tết Nguyên đán", start: "2026-02-15", end: "2026-02-22" },
-    { name: "Giỗ Tổ Hùng Vương", start: "2026-04-26", end: "2026-04-26" },
-    { name: "Ngày Giải phóng miền Nam", start: "2026-04-30", end: "2026-04-30" },
-    { name: "Quốc tế Lao động", start: "2026-05-01", end: "2026-05-01" },
-    { name: "Quốc khánh", start: "2026-09-02", end: "2026-09-02" }
+// Vietnamese Holidays 2025 + 2026
+const VN_HOLIDAYS = [
+    // ── 2025 ─────────────────────────────────────────
+    { name: "Tết Dương lịch 2025",        start: "2025-01-01", end: "2025-01-01" },
+    { name: "Tết Nguyên Đán 2025",         start: "2025-01-27", end: "2025-02-02" }, // 27/1–2/2
+    { name: "Giỗ Tổ Hùng Vương 2025",     start: "2025-04-07", end: "2025-04-07" }, // 10/3 ÂL
+    { name: "Ngày Giải phóng 30/4/2025",  start: "2025-04-30", end: "2025-04-30" },
+    { name: "Quốc tế Lao động 1/5/2025",  start: "2025-05-01", end: "2025-05-01" },
+    { name: "Quốc khánh 2/9/2025",        start: "2025-09-01", end: "2025-09-03" }, // nghỉ bù
+    // ── 2026 ─────────────────────────────────────────
+    { name: "Tết Dương lịch 2026",        start: "2026-01-01", end: "2026-01-01" },
+    { name: "Tết Nguyên Đán 2026",         start: "2026-02-15", end: "2026-02-22" }, // 27/1–3/2 ÂL
+    { name: "Giỗ Tổ Hùng Vương 2026",     start: "2026-04-26", end: "2026-04-26" }, // 10/3 ÂL
+    { name: "Ngày Giải phóng 30/4/2026",  start: "2026-04-30", end: "2026-04-30" },
+    { name: "Quốc tế Lao động 1/5/2026",  start: "2026-05-01", end: "2026-05-01" },
+    { name: "Quốc khánh 2/9/2026",        start: "2026-09-02", end: "2026-09-03" }, // nghỉ bù
 ];
+
+// Backward compat alias
+const HOLIDAYS_2026 = VN_HOLIDAYS;
 
 // Alarm names
 const ALARMS = {
@@ -380,7 +392,7 @@ function checkHoliday(settings, date) {
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     // Check fixed holidays
-    for (const h of HOLIDAYS_2026) {
+    for (const h of VN_HOLIDAYS) {
         if (dateStr >= h.start && dateStr <= h.end) {
             return { isHoliday: true, name: h.name };
         }
