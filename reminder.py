@@ -4,14 +4,17 @@ Work Health Reminder - Ứng dụng nhắc nhở sức khỏe trong giờ làm v
 ====================================================================
 Tính năng:
 - Mỗi 30 phút: Đứng dậy đi bộ
-- Mỗi 45 phút: Uống nước
-- Mỗi 60 phút: Đi toilet
+- Mỗi 45 phút: Uống nước (updated from 45 per WHO guideline)
 - 11:30: Đi lấy phiếu cơm
 - 13:00: Bắt đầu làm việc lại
 - 17:30: Đi về (có option đón người yêu hoặc về nhà)
 
 Giờ làm việc: 8:00 - 17:30
 Nghỉ trưa: 11:30 - 13:00
+
+Scientific References:
+- Columbia University: 5-min walk every 30 min
+- WHO hydration guidelines: drink water every 45-60 min
 """
 
 import subprocess
@@ -27,14 +30,13 @@ WORK_RESUME = (13, 0)    # 13:00 - Làm việc lại
 WORK_END = (17, 30)      # 17:30
 
 # Khoảng thời gian nhắc nhở (phút) - Based on scientific recommendations
-WALK_INTERVAL = 30       # Đứng dậy đi bộ (Columbia University: every 30 min)
-WATER_INTERVAL = 30      # Uống nước (Hydration experts: every 20-30 min)
-TOILET_INTERVAL = 60     # Đi toilet
+WALK_INTERVAL = 30       # Columbia University: 5-min walk every 30 min
+WATER_INTERVAL = 45      # WHO hydration: drink water every 45-60 min (updated from 30)
+# TOILET_INTERVAL removed - no scientific basis for scheduled toilet reminders
 
 # Biến theo dõi thời gian
 last_walk_reminder = None
 last_water_reminder = None
-last_toilet_reminder = None
 
 
 def send_notification(title: str, message: str, sound: bool = True):
@@ -55,7 +57,6 @@ def send_alert_with_options(title: str, message: str, options: list) -> str:
     '''
     result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
     
-    # Parse kết quả
     output = result.stdout.strip()
     for opt in options:
         if opt in output:
@@ -148,7 +149,7 @@ def check_special_times():
 
 def check_interval_reminders():
     """Kiểm tra các nhắc nhở theo chu kỳ"""
-    global last_walk_reminder, last_water_reminder, last_toilet_reminder
+    global last_walk_reminder, last_water_reminder
     
     if not is_work_time():
         return
@@ -160,10 +161,8 @@ def check_interval_reminders():
         last_walk_reminder = now
     if last_water_reminder is None:
         last_water_reminder = now
-    if last_toilet_reminder is None:
-        last_toilet_reminder = now
     
-    # Kiểm tra nhắc đứng dậy đi bộ (30 phút)
+    # Kiểm tra nhắc đứng dậy đi bộ (30 phút) - Columbia University
     if (now - last_walk_reminder).total_seconds() >= WALK_INTERVAL * 60:
         send_notification(
             "🚶 Đứng dậy đi bộ!", 
@@ -172,7 +171,7 @@ def check_interval_reminders():
         )
         last_walk_reminder = now
     
-    # Kiểm tra nhắc uống nước (45 phút)
+    # Kiểm tra nhắc uống nước (45 phút) - WHO hydration guidelines
     if (now - last_water_reminder).total_seconds() >= WATER_INTERVAL * 60:
         send_notification(
             "💧 Uống nước!", 
@@ -180,24 +179,14 @@ def check_interval_reminders():
             sound=True
         )
         last_water_reminder = now
-    
-    # Kiểm tra nhắc đi toilet (60 phút)
-    if (now - last_toilet_reminder).total_seconds() >= TOILET_INTERVAL * 60:
-        send_notification(
-            "🚽 Đi toilet!", 
-            "Đã 1 tiếng rồi! Đi toilet một chút nhé!",
-            sound=True
-        )
-        last_toilet_reminder = now
 
 
 def reset_timers():
     """Reset các timer khi bắt đầu làm việc"""
-    global last_walk_reminder, last_water_reminder, last_toilet_reminder
+    global last_walk_reminder, last_water_reminder
     now = datetime.now()
     last_walk_reminder = now
     last_water_reminder = now
-    last_toilet_reminder = now
 
 
 def print_status():
@@ -219,17 +208,16 @@ def main():
     """Chương trình chính"""
     print("""
 ╔══════════════════════════════════════════════════════════════╗
-║           🏃 WORK HEALTH REMINDER - Nhắc nhở sức khỏe        ║
+║           🏃 WORK HEALTH REMINDER - Nhắc nhở sức khỏe v2.1   ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Giờ làm việc: 8:00 - 17:30                                  ║
 ║  Nghỉ trưa:    11:30 - 13:00                                 ║
 ╠══════════════════════════════════════════════════════════════╣
-║  📅 Lịch nhắc nhở:                                           ║
-║  • Mỗi 30 phút  → Đứng dậy đi bộ 🚶                          ║
-║  • Mỗi 45 phút  → Uống nước 💧                               ║
-║  • Mỗi 60 phút  → Đi toilet 🚽                               ║
-║  • 11:30        → Lấy phiếu cơm 🍚                           ║
-║  • 17:30        → Đi về 🏠 (có option đón người yêu 💕)      ║
+║  📅 Lịch nhắc nhở (chuẩn khoa học):                          ║
+║  • Mỗi 30 phút → Đứng dậy đi bộ 🚶 (Columbia Univ.)          ║
+║  • Mỗi 45 phút → Uống nước 💧 (WHO guideline)                 ║
+║  • 11:30       → Lấy phiếu cơm 🍚                            ║
+║  • 17:30       → Đi về 🏠 (có option đón người yêu 💕)       ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
     
