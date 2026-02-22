@@ -964,7 +964,6 @@ class HealthReminderApp(rumps.App):
             self.pomodoro_menu,
             None,
             self.exercise_menu,
-            self.focus_menu,
             self.water_menu,
             self.calendar_menu,
             self.work_period_menu,
