@@ -90,22 +90,54 @@ const MENUBAR_HTTP_PORT = 9876;
 
 // Vietnamese holidays 2026 (fixed)
 // Vietnamese Holidays 2025 + 2026
-const VN_HOLIDAYS = [
-    // ── 2025 ─────────────────────────────────────────
-    { name: "Tết Dương lịch 2025",        start: "2025-01-01", end: "2025-01-01" },
-    { name: "Tết Nguyên Đán 2025",         start: "2025-01-27", end: "2025-02-02" }, // 27/1–2/2
-    { name: "Giỗ Tổ Hùng Vương 2025",     start: "2025-04-07", end: "2025-04-07" }, // 10/3 ÂL
-    { name: "Ngày Giải phóng 30/4/2025",  start: "2025-04-30", end: "2025-04-30" },
-    { name: "Quốc tế Lao động 1/5/2025",  start: "2025-05-01", end: "2025-05-01" },
-    { name: "Quốc khánh 2/9/2025",        start: "2025-09-01", end: "2025-09-03" }, // nghỉ bù
-    // ── 2026 ─────────────────────────────────────────
-    { name: "Tết Dương lịch 2026",        start: "2026-01-01", end: "2026-01-01" },
-    { name: "Tết Nguyên Đán 2026",         start: "2026-02-15", end: "2026-02-22" }, // 27/1–3/2 ÂL
-    { name: "Giỗ Tổ Hùng Vương 2026",     start: "2026-04-26", end: "2026-04-26" }, // 10/3 ÂL
-    { name: "Ngày Giải phóng 30/4/2026",  start: "2026-04-30", end: "2026-04-30" },
-    { name: "Quốc tế Lao động 1/5/2026",  start: "2026-05-01", end: "2026-05-01" },
-    { name: "Quốc khánh 2/9/2026",        start: "2026-09-02", end: "2026-09-03" }, // nghỉ bù
+// Ngày lễ cố định (recurring hàng năm) — không cần năm
+const VN_HOLIDAYS_FIXED = [
+    { name: "Tết Dương lịch",          month: 1,  day: 1,  days: 1 },
+    { name: "Ngày Giải phóng miền Nam", month: 4,  day: 30, days: 1 },
+    { name: "Quốc tế Lao động",        month: 5,  day: 1,  days: 1 },
+    { name: "Quốc khánh",              month: 9,  day: 2,  days: 2 }, // 2/9 + nghỉ bù
 ];
+
+// Ngày lễ theo Âm lịch (phải ghi theo năm vì mỗi năm khác ngày Dương)
+const VN_HOLIDAYS_LUNAR = [
+    // 2025
+    { name: "Tết Nguyên Đán 2025",      start: "2025-01-27", end: "2025-02-02" },
+    { name: "Giỗ Tổ Hùng Vương 2025",   start: "2025-04-07", end: "2025-04-07" },
+    // 2026
+    { name: "Tết Nguyên Đán 2026",      start: "2026-02-15", end: "2026-02-22" },
+    { name: "Giỗ Tổ Hùng Vương 2026",   start: "2026-04-26", end: "2026-04-26" },
+    // 2027
+    { name: "Tết Nguyên Đán 2027",      start: "2027-02-04", end: "2027-02-10" },
+    { name: "Giỗ Tổ Hùng Vương 2027",   start: "2027-04-15", end: "2027-04-15" },
+];
+
+// Helper: build VN_HOLIDAYS cho năm hiện tại từ fixed + lunar
+function getVnHolidays(year) {
+    const holidays = [];
+    if (!year) year = new Date().getFullYear();
+
+    // Fixed holidays (recurring)
+    for (const h of VN_HOLIDAYS_FIXED) {
+        const startDate = `${year}-${String(h.month).padStart(2,'0')}-${String(h.day).padStart(2,'0')}`;
+        const endDay = h.day + h.days - 1;
+        const endDate = `${year}-${String(h.month).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
+        holidays.push({ name: h.name, start: startDate, end: endDate });
+    }
+
+    // Lunar holidays (year-specific)
+    for (const h of VN_HOLIDAYS_LUNAR) {
+        if (h.start.startsWith(String(year))) {
+            holidays.push(h);
+        }
+    }
+
+    // Sort by start date
+    holidays.sort((a, b) => a.start.localeCompare(b.start));
+    return holidays;
+}
+
+// Build for current + next year
+const VN_HOLIDAYS = [...getVnHolidays(new Date().getFullYear()), ...getVnHolidays(new Date().getFullYear() + 1)];
 
 
 // Alarm names
@@ -879,12 +911,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
     if (message.action === 'getCalendarStatus') {
+        (async () => {
         const meeting = isInMeeting();
         const upcoming = getUpcomingMeeting();
-        const status = calendarLastSync
-            ? `✅ Synced ${Math.round((Date.now() - calendarLastSync) / 60000)} phút trước · ${calendarEvents.length} events`
-            : calendarEvents.length ? `📦 Từ cache · ${calendarEvents.length} events` : '⚙️ Chưa sync';
+        let status;
+        if (calendarLastSync) {
+            const ago = Math.round((Date.now() - calendarLastSync) / 60000);
+            status = `✅ Đã sync ${ago < 1 ? 'vừa xong' : ago + ' phút trước'} · ${calendarEvents.length} sự kiện`;
+        } else if (calendarEvents.length) {
+            status = `📦 Từ cache · ${calendarEvents.length} sự kiện`;
+        } else {
+            const settings = await getSettings();
+            status = settings.calendarIcsUrl ? '⏳ Chưa sync — bấm 🔄 Sync ngay' : '⚙️ Chưa nhập ICS URL';
+        }
         sendResponse({ status, meeting, upcoming, lastSync: calendarLastSync?.toISOString() });
+        })();
         return true;
     }
     if (message.action === 'saveCalendarUrl') {
@@ -1294,10 +1335,16 @@ function parseIcsContent(icsText) {
 async function syncCalendar() {
     const settings = await getSettings();
     const url = settings.calendarIcsUrl;
-    if (!url) return;
+    if (!url) return { success: false, error: 'Chưa nhập ICS URL' };
 
     try {
-        const resp = await fetch(url);
+        // Timeout 15 giây
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const text = await resp.text();
         const now = new Date();
