@@ -107,8 +107,6 @@ const VN_HOLIDAYS = [
     { name: "Quốc khánh 2/9/2026",        start: "2026-09-02", end: "2026-09-03" }, // nghỉ bù
 ];
 
-// Backward compat alias
-const HOLIDAYS_2026 = VN_HOLIDAYS;
 
 // Alarm names
 const ALARMS = {
@@ -1042,7 +1040,7 @@ async function handleMessage(message) {
         case 'getHolidays':
             return {
                 success: true,
-                fixedHolidays: HOLIDAYS_2026,
+                fixedHolidays: VN_HOLIDAYS,
                 customHolidays: settings.customHolidays || []
             };
 
