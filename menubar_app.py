@@ -27,6 +27,9 @@ except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "rumps"], check=True)
     import rumps
 
+from water_tracker import water_tracker
+from calendar_sync import calendar_sync
+
 from exercises import (
     NECK_EXERCISES, SHOULDER_EXERCISES, EYE_EXERCISES, 
     BREATHING_EXERCISES, POSTURE_CHECK, RULE_20_20_20
@@ -53,6 +56,11 @@ class WorkConfig:
     sunday_end: tuple = (12, 0)
     is_configured: bool = False
     morning_reminder_start: tuple = (7, 30)
+
+    # Water Tracker
+    water_goal_ml: int = 2000    # Mục tiêu uống nước/ngày (ml)
+    water_cup_ml: int = 200      # Lượng nước mỗi ly (ml)
+    calendar_enabled: bool = False  # Bật/tắt Google Calendar integration
 
     # Pomodoro
     pomodoro_work: int = 25
@@ -226,6 +234,9 @@ def save_config(config: WorkConfig, intervals: ReminderInterval) -> bool:
             "pomodoro_work": config.pomodoro_work,
             "pomodoro_break": config.pomodoro_break,
             "pomodoro_long_break": config.pomodoro_long_break,
+            "water_goal_ml": config.water_goal_ml,
+            "water_cup_ml": config.water_cup_ml,
+            "calendar_enabled": config.calendar_enabled,
         },
         "intervals": {
             "walk": intervals.walk,
@@ -277,6 +288,9 @@ def load_config() -> tuple:
             pomodoro_work=wc.get("pomodoro_work", 25),
             pomodoro_break=wc.get("pomodoro_break", 5),
             pomodoro_long_break=wc.get("pomodoro_long_break", 15),
+            water_goal_ml=wc.get("water_goal_ml", 2000),
+            water_cup_ml=wc.get("water_cup_ml", 200),
+            calendar_enabled=wc.get("calendar_enabled", False),
         )
 
         reminder_intervals = ReminderInterval(
@@ -701,6 +715,37 @@ class HealthReminderApp(rumps.App):
         self.quick_menu.add(rumps.MenuItem("👁️ Đã nhìn xa", callback=self.reset_eye))
         self.quick_menu.add(rumps.MenuItem("🔄 Reset tất cả", callback=self.reset_all_timers))
 
+        # Water Tracker submenu
+        self.water_menu = rumps.MenuItem("💧 Nước hôm nay")
+        self.water_status_item = rumps.MenuItem("💧 0 / 2000ml (0%)")
+        self.water_bar_item = rumps.MenuItem("░░░░░░░░░░░░░░░░")
+        self.water_drink_default = rumps.MenuItem(
+            f"✅ Uống {CONFIG.water_cup_ml}ml",
+            callback=self.water_drink_default_cb
+        )
+        self.water_drink_custom = rumps.MenuItem("✏️ Uống lượng khác...", callback=self.water_drink_custom_cb)
+        self.water_reset_item = rumps.MenuItem("🔄 Reset hôm nay", callback=self.water_reset_cb)
+        self.water_menu.add(self.water_status_item)
+        self.water_menu.add(self.water_bar_item)
+        self.water_menu.add(None)
+        self.water_menu.add(self.water_drink_default)
+        self.water_menu.add(self.water_drink_custom)
+        self.water_menu.add(None)
+        self.water_menu.add(self.water_reset_item)
+
+        # Calendar submenu
+        self.calendar_menu = rumps.MenuItem("📅 Google Calendar")
+        self.calendar_status_item = rumps.MenuItem("⚙️ Chưa cấu hình")
+        self.calendar_toggle_item = rumps.MenuItem(
+            "🔔 Bật auto-pause khi họp",
+            callback=self.calendar_toggle_cb
+        )
+        self.calendar_sync_item = rumps.MenuItem("🔄 Sync ngay", callback=self.calendar_sync_now_cb)
+        self.calendar_menu.add(self.calendar_status_item)
+        self.calendar_menu.add(None)
+        self.calendar_menu.add(self.calendar_toggle_item)
+        self.calendar_menu.add(self.calendar_sync_item)
+
         # YouTube submenu
         self.youtube_menu = rumps.MenuItem("📺 YouTube")
         self.youtube_status = rumps.MenuItem("Không có video")
@@ -723,6 +768,14 @@ class HealthReminderApp(rumps.App):
         self.youtube_http_thread = threading.Thread(target=run_youtube_http_server, daemon=True)
         self.youtube_http_thread.start()
 
+        # Start Google Calendar background sync (nếu đã enable)
+        if CONFIG.calendar_enabled and calendar_sync.is_available:
+            calendar_sync.start_background_sync()
+
+        # Sync water tracker goal từ config
+        water_tracker.goal_ml = CONFIG.water_goal_ml
+        water_tracker.cup_size_ml = CONFIG.water_cup_ml
+
         # Build menu
         self.menu = [
             self.status_item,
@@ -734,6 +787,8 @@ class HealthReminderApp(rumps.App):
             self.pomodoro_menu,
             None,
             self.exercise_menu,
+            self.water_menu,
+            self.calendar_menu,
             self.youtube_menu,
             self.quick_menu,
             None,
@@ -804,6 +859,20 @@ class HealthReminderApp(rumps.App):
         self.intervals_menu.add(rumps.MenuItem(f"🧘 Giãn cổ: {INTERVALS.neck_stretch} phút", callback=lambda _: self.edit_interval("neck_stretch")))
         self.intervals_menu.add(rumps.MenuItem(f"🪑 Tư thế: {INTERVALS.posture} phút", callback=lambda _: self.edit_interval("posture")))
         self.settings_menu.add(self.intervals_menu)
+
+        self.settings_menu.add(None)
+
+        # Water settings
+        self.water_settings_menu = rumps.MenuItem("💧 Cài đặt nước")
+        self.water_settings_menu.add(rumps.MenuItem(
+            f"🎯 Mục tiêu: {CONFIG.water_goal_ml}ml/ngày",
+            callback=self.edit_water_goal
+        ))
+        self.water_settings_menu.add(rumps.MenuItem(
+            f"🥤 Ly mặc định: {CONFIG.water_cup_ml}ml",
+            callback=self.edit_water_cup
+        ))
+        self.settings_menu.add(self.water_settings_menu)
 
         self.settings_menu.add(None)
         self.settings_menu.add(rumps.MenuItem("ℹ️ Phiên bản 3.0 PRO"))
@@ -879,6 +948,12 @@ class HealthReminderApp(rumps.App):
 
         # Update YouTube menu
         self.update_youtube_menu()
+
+        # Update water status
+        self.update_water_menu()
+
+        # Update calendar status
+        self.update_calendar_menu()
 
     def get_next_reminders(self) -> dict:
         """Lấy thời gian đến nhắc nhở tiếp theo"""
@@ -1233,6 +1308,137 @@ class HealthReminderApp(rumps.App):
             save_config(CONFIG, INTERVALS)
             send_notification("🔄 Đã đặt lại", "Tất cả cài đặt đã về mặc định.")
 
+    # ============================================
+    # WATER TRACKER METHODS
+    # ============================================
+
+    def update_water_menu(self):
+        """Cập nhật water tracker menu"""
+        status = water_tracker.get_status()
+        self.water_status_item.title = status['menu_title']
+        bar = status['status_icon'] + ' ' + status['progress_bar']
+        self.water_bar_item.title = bar
+        cup = water_tracker.cup_size_ml
+        self.water_drink_default.title = f"✅ Uống {cup}ml"
+        # Update menu title with icon
+        self.water_menu.title = f"💧 Nước: {status['total_ml']}/{status['goal_ml']}ml"
+
+    def water_drink_default_cb(self, _):
+        """Ghi nhận uống một ly nước (default cup size)"""
+        ml = water_tracker.cup_size_ml
+        status = water_tracker.add_water(ml)
+        send_notification(
+            "💧 Đã ghi nhận!",
+            f"+{ml}ml → Hôm nay: {status['total_ml']}/{status['goal_ml']}ml ({status['pct']}%)"
+        )
+        if status['pct'] >= 100:
+            send_notification("🎉 Đạt mục tiêu!", f"Đã uống đủ {status['goal_ml']}ml hôm nay! Tuyệt vời!")
+
+    def water_drink_custom_cb(self, _):
+        """Ghi nhận uống lượng nước tùy chỉnh"""
+        script = """
+        set userInput to text returned of (display dialog "Nhập lượng nước đã uống (ml):" with title "💧 Uống nước" default answer "200")
+        return userInput
+        """
+        import subprocess
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+        try:
+            ml = int(result.stdout.strip())
+            if ml > 0:
+                status = water_tracker.add_water(ml)
+                send_notification(
+                    "💧 Đã ghi nhận!",
+                    f"+{ml}ml → Hôm nay: {status['total_ml']}/{status['goal_ml']}ml ({status['pct']}%)"
+                )
+        except (ValueError, Exception):
+            pass
+
+    def water_reset_cb(self, _):
+        """Reset water tracking hôm nay"""
+        water_tracker.reset_today()
+        send_notification("🔄 Đã reset", "Lượng nước hôm nay đã về 0ml.")
+
+    def edit_water_goal(self, _):
+        """Chỉnh mục tiêu uống nước"""
+        global CONFIG
+        new_goal = ask_number_input(
+            "💧 Mục tiêu nước/ngày",
+            f"Nhập số ml mục tiêu/ngày (hiện tại: {CONFIG.water_goal_ml}ml)",
+            CONFIG.water_goal_ml
+        )
+        if new_goal > 0:
+            CONFIG.water_goal_ml = new_goal
+            water_tracker.goal_ml = new_goal
+            save_config(CONFIG, INTERVALS)
+            send_notification("✅ Đã cập nhật", f"Mục tiêu nước: {new_goal}ml/ngày")
+
+    def edit_water_cup(self, _):
+        """Chỉnh kích thước ly mặc định"""
+        global CONFIG
+        new_cup = ask_number_input(
+            "🥤 Kích thước ly",
+            f"Nhập ml mỗi ly (hiện tại: {CONFIG.water_cup_ml}ml)",
+            CONFIG.water_cup_ml
+        )
+        if new_cup > 0:
+            CONFIG.water_cup_ml = new_cup
+            water_tracker.cup_size_ml = new_cup
+            save_config(CONFIG, INTERVALS)
+            send_notification("✅ Đã cập nhật", f"Ly mặc định: {new_cup}ml")
+
+    # ============================================
+    # CALENDAR METHODS
+    # ============================================
+
+    def update_calendar_menu(self):
+        """Cập nhật calendar menu status"""
+        self.calendar_status_item.title = calendar_sync.get_status_text()
+        enabled = CONFIG.calendar_enabled
+        self.calendar_toggle_item.title = (
+            "🔕 Tắt auto-pause khi họp" if enabled
+            else "🔔 Bật auto-pause khi họp"
+        )
+
+    def calendar_toggle_cb(self, _):
+        """Bật/tắt calendar integration"""
+        global CONFIG
+        CONFIG.calendar_enabled = not CONFIG.calendar_enabled
+        save_config(CONFIG, INTERVALS)
+
+        if CONFIG.calendar_enabled:
+            if not calendar_sync.is_available:
+                send_notification(
+                    "⚠️ Cần cài thư viện",
+                    "Chạy: pip install google-api-python-client google-auth-oauthlib"
+                )
+                CONFIG.calendar_enabled = False
+                save_config(CONFIG, INTERVALS)
+                return
+            if not calendar_sync.is_configured:
+                send_notification(
+                    "⚙️ Cần setup credentials",
+                    "Đặt file google_credentials.json vào ~/Library/Application Support/WorkHealthReminder/"
+                )
+                CONFIG.calendar_enabled = False
+                save_config(CONFIG, INTERVALS)
+                return
+            calendar_sync.start_background_sync()
+            send_notification("📅 Calendar bật", "Sẽ tự pause nhắc nhở khi đang trong meeting!")
+        else:
+            send_notification("📅 Calendar tắt", "Auto-pause đã tắt.")
+
+    def calendar_sync_now_cb(self, _):
+        """Sync calendar ngay lập tức"""
+        if not calendar_sync.is_available:
+            send_notification("⚠️ Chưa cài thư viện", "pip install google-api-python-client google-auth-oauthlib")
+            return
+        if not calendar_sync.is_configured:
+            send_notification("⚙️ Chưa setup", "Cần file google_credentials.json")
+            return
+        import threading
+        threading.Thread(target=calendar_sync._sync_now, daemon=True).start()
+        send_notification("🔄 Đang sync...", "Google Calendar đang được đồng bộ.")
+
     def quit_app(self, _):
         """Thoát ứng dụng"""
         send_notification("👋 Tạm biệt", "Health Reminder đã dừng. Nhớ chăm sóc sức khỏe nhé!")
@@ -1263,6 +1469,18 @@ class HealthReminderApp(rumps.App):
                     if self.tracker.is_focus_active() or self.tracker.is_pomodoro_active():
                         time.sleep(5)
                         continue
+
+                    # Auto-pause nếu đang trong meeting (Google Calendar)
+                    if CONFIG.calendar_enabled and calendar_sync.is_available:
+                        should_pause, reason = calendar_sync.should_pause_reminders()
+                        if should_pause:
+                            if not getattr(self, '_calendar_pause_notified', False):
+                                send_notification("⏸️ Tạm dừng nhắc nhở", reason)
+                                self._calendar_pause_notified = True
+                            time.sleep(30)
+                            continue
+                        else:
+                            self._calendar_pause_notified = False
 
                     # Reset khi bắt đầu làm việc
                     if is_work_time() and not was_working:
@@ -1395,7 +1613,8 @@ class HealthReminderApp(rumps.App):
             self.tracker.last_walk = now
         
         if minutes_since(self.tracker.last_water) >= INTERVALS.water:
-            send_notification("💧 Uống nước!", "Uống một ly nước lọc nhé!")
+            msg = water_tracker.get_reminder_message()
+            send_notification("💧 Uống nước!", msg)
             self.tracker.last_water = now
         
         if minutes_since(self.tracker.last_toilet) >= INTERVALS.toilet:
