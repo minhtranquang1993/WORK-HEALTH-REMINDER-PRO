@@ -23,9 +23,9 @@ const DEFAULT_SETTINGS = {
     workPeriodStart: "",  // "YYYY-MM-DD" format
     workPeriodEnd: "",    // "YYYY-MM-DD" format
 
-    // Telegram
-    telegramBotToken: "8583787983:AAHlW0mGpe8erumz0peN1gtXU2X7BtK2Zes",
-    telegramChatId: "1661694132",
+    // Telegram (user tự nhập trong Settings)
+    telegramBotToken: "",
+    telegramChatId: "",
     telegramReportTime: { hour: 17, minute: 0 },
 
     // Pomodoro settings
