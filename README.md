@@ -11,7 +11,6 @@
 - [Cài đặt & Chạy app](#-cài-đặt--chạy-app)
 - [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
 - [Cài đặt Telegram](#-cài-đặt-telegram-nhận-báo-cáo-todo)
-- [Cài đặt Google Calendar](#-cài-đặt-google-calendar-tự-dừng-khi-họp)
 - [Chrome Extension](#-chrome-extension)
 - [Câu hỏi thường gặp](#-câu-hỏi-thường-gặp)
 
@@ -50,11 +49,6 @@
 - Tích hợp sẵn lịch nghỉ lễ Việt Nam 2025–2026
 - Tự thêm ngày nghỉ tùy chỉnh (công ty, cá nhân)
 - App tự dừng vào ngày lễ, không cần tắt thủ công
-
-### 📅 Tự động dừng khi họp (ICS Calendar)
-- Kết nối lịch qua ICS URL — không cần đăng nhập
-- Tự động dừng nhắc nhở khi đang trong meeting
-- Hỗ trợ Google Calendar, Outlook, Apple Calendar
 
 ### 📝 Todo & Báo cáo Telegram *(mới)*
 - Quản lý task trong ngày (Chrome Extension)
@@ -122,7 +116,6 @@ Sau khi chạy, click vào icon 🏃 trên menu bar để mở:
 │   ├── ✏️ Uống lượng khác...
 │   └── 🔄 Reset hôm nay
 │
-├── 📅 Calendar             ← Kết nối lịch họp (ICS)
 ├── 🏖️ Chế độ nghỉ phép    ← Tạm dừng khi nghỉ/công tác
 ├── 🎌 Ngày lễ             ← Lịch lễ VN + ngày nghỉ tùy chỉnh
 ├── 📱 Telegram            ← Nhận báo cáo Todo cuối ngày
@@ -166,31 +159,6 @@ Tính năng này gửi báo cáo tổng kết Todo cuối ngày vào Telegram c�
 
 ---
 
-## 📅 Cài đặt Google Calendar (Tự dừng khi họp)
-
-Không cần đăng nhập, chỉ cần copy 1 link ICS.
-
-### Lấy ICS Link
-
-**Google Calendar:**
-1. Vào [calendar.google.com](https://calendar.google.com)
-2. Click ⚙️ → **Settings**
-3. Chọn lịch → kéo xuống **"Secret address in iCal format"**
-4. Copy link
-
-**Outlook:** Calendar → Share → Get a link → ICS  
-**Apple Calendar:** Right-click tên lịch → Share Calendar → Copy Link
-
-### Nhập vào app
-
-**macOS:**
-> Click 🏃 → 📅 Calendar → 🔗 Nhập ICS URL → Paste → OK
-
-**Chrome Extension:**
-> ⚙️ Settings → 📅 Google Calendar (ICS) → Paste URL → Tự động sync
-
----
-
 ## 🌐 Chrome Extension
 
 Hoạt động trên cả **macOS và Windows**, không cần cài Python.
@@ -210,7 +178,7 @@ Hoạt động trên cả **macOS và Windows**, không cần cài Python.
 | 📝 Todo | Quản lý task trong ngày |
 | 🎯 Focus | Focus Mode + Pomodoro |
 | 📺 YouTube | Điều khiển YouTube đang phát |
-| ⚙️ Settings | Giờ làm, Telegram, Water goal, Calendar ICS... |
+| ⚙️ Settings | Giờ làm, Telegram, Water goal... |
 
 ---
 
@@ -262,9 +230,6 @@ Sau đó double-click bình thường, không bị hỏi nữa.
 **Q: Chrome Extension không load được?**  
 → Đảm bảo đã bật **Developer mode** trong `chrome://extensions/`
 
-**Q: ICS URL không sync được?**  
-→ Kiểm tra URL bắt đầu bằng `https://` và máy đang có internet
-
 **Q: Muốn dùng trên cả Mac lẫn Windows?**  
 → Dùng **Chrome Extension** — không cần cài Python, chạy được trên cả 2
 
@@ -284,7 +249,6 @@ WORK-HEALTH-REMINDER-PRO/
 ├── reminder_gui.py            ← GUI version
 ├── exercises.py               ← Module bài tập
 ├── water_tracker.py           ← Water Tracker module
-├── calendar_sync.py           ← ICS Calendar Sync module
 │
 ├── chrome-extension/          ← Chrome Extension (macOS + Windows)
 │   ├── manifest.json
