@@ -1266,12 +1266,7 @@ function parseIcsContent(icsText) {
     const events = [];
     let current = null;
     // Unfold lines (ICS: long lines start with space/tab)
-    const lines = icsText.replace(/
- /g, '').replace(/
-	/g, '').split(/
-|
-|
-/);
+    const lines = icsText.replace(/\r\n /g, '').replace(/\r\n\t/g, '').split(/\r\n|\n|\r/);
 
     for (const line of lines) {
         if (line === 'BEGIN:VEVENT') {
