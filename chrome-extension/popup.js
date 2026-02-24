@@ -215,27 +215,19 @@ class PopupController {
         this.btnResetSettings.addEventListener('click', () => this.resetSettings());
         this.btnTestTelegram.addEventListener('click', () => this.testTelegram());
 
-        // Water Tracker
-        this.btnWater200?.addEventListener('click', () => this.addWater(200));
-        this.btnWater300?.addEventListener('click', () => this.addWater(300));
-        this.btnWater500?.addEventListener('click', () => this.addWater(500));
+        // Water Tracker — dùng event delegation để đảm bảo hoạt động
+        const waterActions = document.querySelector('.water-actions');
+        if (waterActions) {
+            waterActions.addEventListener('click', (e) => {
+                const btn = e.target.closest('.water-btn');
+                if (!btn) return;
 
-        if (this.btnWaterUndo) {
-            this.btnWaterUndo.addEventListener('click', () => {
-                console.log('[Water] Undo clicked');
-                this.undoWater();
+                if (btn.id === 'btnWater200') this.addWater(200);
+                else if (btn.id === 'btnWater300') this.addWater(300);
+                else if (btn.id === 'btnWater500') this.addWater(500);
+                else if (btn.id === 'btnWaterUndo') this.undoWater();
+                else if (btn.id === 'btnWaterReset') this.resetWater();
             });
-        } else {
-            console.warn('[Water] btnWaterUndo not found in DOM');
-        }
-
-        if (this.btnWaterReset) {
-            this.btnWaterReset.addEventListener('click', () => {
-                console.log('[Water] Reset clicked');
-                this.resetWater();
-            });
-        } else {
-            console.warn('[Water] btnWaterReset not found in DOM');
         }
 
         // YouTube controls
