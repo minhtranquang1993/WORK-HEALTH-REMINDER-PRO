@@ -2267,8 +2267,8 @@ select:focus {
 .water-tracker {
     margin: 12px 0 8px;
     padding: 12px;
-    background: rgba(33, 150, 243, 0.08);
-    border: 1px solid rgba(33, 150, 243, 0.2);
+    background: rgba(33, 150, 243, 0.05);
+    border: 1px solid rgba(33, 150, 243, 0.15);
     border-radius: 10px;
 }
 
@@ -2288,22 +2288,23 @@ select:focus {
 .water-amount {
     font-size: 12px;
     font-weight: 600;
-    color: #2196F3;
+    color: #1976D2;
 }
 
 .water-progress-bar {
-    height: 8px;
-    background: rgba(33, 150, 243, 0.15);
-    border-radius: 4px;
+    height: 10px;
+    background: #e3e8ee;
+    border-radius: 5px;
     overflow: hidden;
     margin-bottom: 4px;
 }
 
 .water-progress-fill {
     height: 100%;
-    background: #4CAF50;
-    border-radius: 4px;
+    background: linear-gradient(90deg, #42a5f5, #1976D2);
+    border-radius: 5px;
     transition: width 0.4s ease, background 0.3s ease;
+    min-width: 0;
 }
 
 .water-pct {
@@ -2315,40 +2316,51 @@ select:focus {
 
 .water-actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
 }
 
 .water-btn {
     flex: 1;
-    padding: 6px 4px;
-    border: 1px solid rgba(33, 150, 243, 0.3);
-    border-radius: 6px;
-    background: rgba(33, 150, 243, 0.1);
-    color: #2196F3;
+    padding: 8px 4px;
+    border: 1.5px solid #42a5f5;
+    border-radius: 8px;
+    background: #fff;
+    color: #1976D2;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .water-btn:hover {
-    background: rgba(33, 150, 243, 0.2);
+    background: #e3f2fd;
     transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(33, 150, 243, 0.25);
 }
 
 .water-btn:active {
-    transform: translateY(0);
+    transform: scale(0.95);
+    background: #bbdefb;
+}
+
+.water-btn.water-added {
+    background: #4CAF50 !important;
+    color: #fff !important;
+    border-color: #4CAF50 !important;
 }
 
 .water-btn.water-reset {
-    flex: 0 0 36px;
-    border-color: rgba(150, 150, 150, 0.3);
-    background: rgba(150, 150, 150, 0.1);
-    color: #888;
+    flex: 0 0 40px;
+    border-color: #bbb;
+    background: #f5f5f5;
+    color: #777;
 }
 
 .water-btn.water-reset:hover {
-    background: rgba(150, 150, 150, 0.2);
+    background: #eee;
+    border-color: #999;
 }
 
 

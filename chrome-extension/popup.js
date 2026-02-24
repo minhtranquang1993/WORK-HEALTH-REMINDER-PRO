@@ -553,13 +553,58 @@ class PopupController {
     // ============================================
 
     async addWater(ml) {
-        const response = await chrome.runtime.sendMessage({ action: 'addWater', ml });
-        if (response?.log) this.updateWaterUI(response.log);
+        // Visual feedback ngay lập tức
+        const btn = document.getElementById(`btnWater${ml}`);
+        if (btn) {
+            btn.classList.add('water-added');
+            btn.textContent = '✓';
+            setTimeout(() => {
+                btn.classList.remove('water-added');
+                btn.textContent = `+${ml}ml`;
+            }, 600);
+        }
+
+        // Optimistic UI update (update ngay, không chờ background)
+        const goal = parseInt(this.waterAmount?.textContent?.match(/\d+$/)?.[0]) || 2000;
+        const currentMatch = this.waterAmount?.textContent?.match(/^(\d+)/);
+        const currentMl = parseInt(currentMatch?.[1]) || 0;
+        const newTotal = currentMl + ml;
+        const pct = Math.min(100, Math.round(newTotal * 100 / goal));
+        this.updateWaterUI({ totalMl: newTotal, goalMl: goal });
+
+        // Send to background with retry
+        try {
+            const response = await this.sendWithRetry({ action: 'addWater', ml }, 2);
+            if (response?.log) this.updateWaterUI(response.log);
+        } catch (e) {
+            console.warn('[Water] Background unreachable, optimistic update kept');
+        }
+    }
+
+    async sendWithRetry(message, retries = 2) {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const response = await chrome.runtime.sendMessage(message);
+                if (response) return response;
+            } catch (e) {
+                if (i < retries) {
+                    await new Promise(r => setTimeout(r, 300));
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return null;
     }
 
     async resetWater() {
-        const response = await chrome.runtime.sendMessage({ action: 'resetWater' });
-        if (response?.log) this.updateWaterUI(response.log);
+        try {
+            const response = await this.sendWithRetry({ action: 'resetWater' }, 2);
+            if (response?.log) this.updateWaterUI(response.log);
+        } catch (e) {
+            // Fallback: reset UI locally
+            this.updateWaterUI({ totalMl: 0, goalMl: 2000 });
+        }
     }
 
     updateWaterUI(log) {
@@ -572,14 +617,21 @@ class PopupController {
         if (this.waterProgressFill) this.waterProgressFill.style.width = `${pct}%`;
         if (this.waterPct) this.waterPct.textContent = `${pct}%`;
 
-        // Đổi màu progress bar theo %
-        const color = pct >= 100 ? '#2196F3' : pct >= 60 ? '#4CAF50' : pct >= 30 ? '#FF9800' : '#f44336';
-        if (this.waterProgressFill) this.waterProgressFill.style.background = color;
+        // Gradient color: xanh dương → xanh lá → vàng gold khi đạt 100%
+        let bg;
+        if (pct >= 100) bg = 'linear-gradient(90deg, #43a047, #66bb6a)';
+        else if (pct >= 60) bg = 'linear-gradient(90deg, #42a5f5, #1976D2)';
+        else bg = 'linear-gradient(90deg, #64b5f6, #42a5f5)';
+        if (this.waterProgressFill) this.waterProgressFill.style.background = bg;
     }
 
     async loadWaterData() {
-        const response = await chrome.runtime.sendMessage({ action: 'getWaterLog' });
-        if (response?.log) this.updateWaterUI(response.log);
+        try {
+            const response = await this.sendWithRetry({ action: 'getWaterLog' }, 2);
+            if (response?.log) this.updateWaterUI(response.log);
+        } catch (e) {
+            console.warn('[Water] Could not load water data:', e);
+        }
     }
 
     async testTelegram() {
