@@ -911,6 +911,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         resetWaterToday().then(log => sendResponse({ log }));
         return true;
     }
+    if (message.action === 'undoWater') {
+        undoLastWater().then(result => sendResponse(result));
+        return true;
+    }
 
     // Handle YouTube state updates from content script
     if (message.action === 'youtubeStateUpdate') {
@@ -1255,6 +1259,17 @@ async function resetWaterToday() {
     const newLog = { date: today, totalMl: 0, entries: [], goalMl: settings.waterGoalMl || 2000 };
     await chrome.storage.local.set({ waterLog: newLog });
     return newLog;
+}
+
+async function undoLastWater() {
+    const log = await getWaterLog();
+    if (!log.entries || log.entries.length === 0) {
+        return { error: 'Không có gì để hoàn tác' };
+    }
+    const lastEntry = log.entries.pop();
+    log.totalMl = Math.max(0, (log.totalMl || 0) - lastEntry.ml);
+    await chrome.storage.local.set({ waterLog: log });
+    return { log };
 }
 
 async function performTodoDailyReset() {

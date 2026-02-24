@@ -91,6 +91,7 @@ class PopupController {
         this.btnWater300 = document.getElementById('btnWater300');
         this.btnWater500 = document.getElementById('btnWater500');
         this.btnWaterReset = document.getElementById('btnWaterReset');
+        this.btnWaterUndo = document.getElementById('btnWaterUndo');
         this.settingWaterGoal = document.getElementById('settingWaterGoal');
         this.settingWaterCup = document.getElementById('settingWaterCup');
 
@@ -219,6 +220,7 @@ class PopupController {
         this.btnWater300?.addEventListener('click', () => this.addWater(300));
         this.btnWater500?.addEventListener('click', () => this.addWater(500));
         this.btnWaterReset?.addEventListener('click', () => this.resetWater());
+        this.btnWaterUndo?.addEventListener('click', () => this.undoWater());
 
         // YouTube controls
         if (this.btnOpenYoutube) {
@@ -602,8 +604,29 @@ class PopupController {
             const response = await this.sendWithRetry({ action: 'resetWater' }, 2);
             if (response?.log) this.updateWaterUI(response.log);
         } catch (e) {
-            // Fallback: reset UI locally
             this.updateWaterUI({ totalMl: 0, goalMl: 2000 });
+        }
+    }
+
+    async undoWater() {
+        const btn = this.btnWaterUndo;
+        try {
+            const response = await this.sendWithRetry({ action: 'undoWater' }, 2);
+            if (response?.log) {
+                this.updateWaterUI(response.log);
+                if (btn) {
+                    btn.classList.add('water-added');
+                    btn.textContent = '✓';
+                    setTimeout(() => { btn.classList.remove('water-added'); btn.textContent = '↩'; }, 600);
+                }
+            } else if (response?.error) {
+                if (btn) {
+                    btn.textContent = '✗';
+                    setTimeout(() => { btn.textContent = '↩'; }, 800);
+                }
+            }
+        } catch (e) {
+            console.warn('[Water] Undo failed:', e);
         }
     }
 
