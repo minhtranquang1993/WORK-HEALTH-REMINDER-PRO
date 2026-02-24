@@ -219,8 +219,24 @@ class PopupController {
         this.btnWater200?.addEventListener('click', () => this.addWater(200));
         this.btnWater300?.addEventListener('click', () => this.addWater(300));
         this.btnWater500?.addEventListener('click', () => this.addWater(500));
-        this.btnWaterReset?.addEventListener('click', () => this.resetWater());
-        this.btnWaterUndo?.addEventListener('click', () => this.undoWater());
+
+        if (this.btnWaterUndo) {
+            this.btnWaterUndo.addEventListener('click', () => {
+                console.log('[Water] Undo clicked');
+                this.undoWater();
+            });
+        } else {
+            console.warn('[Water] btnWaterUndo not found in DOM');
+        }
+
+        if (this.btnWaterReset) {
+            this.btnWaterReset.addEventListener('click', () => {
+                console.log('[Water] Reset clicked');
+                this.resetWater();
+            });
+        } else {
+            console.warn('[Water] btnWaterReset not found in DOM');
+        }
 
         // YouTube controls
         if (this.btnOpenYoutube) {
@@ -600,10 +616,16 @@ class PopupController {
     }
 
     async resetWater() {
+        // Confirm trước khi reset
+        const currentText = this.waterAmount?.textContent || '0';
+        if (!confirm(`Xóa toàn bộ nước về 0?\n(Hiện tại: ${currentText})`)) return;
+
         try {
             const response = await this.sendWithRetry({ action: 'resetWater' }, 2);
+            console.log('[Water] Reset response:', response);
             if (response?.log) this.updateWaterUI(response.log);
         } catch (e) {
+            console.error('[Water] Reset error:', e);
             this.updateWaterUI({ totalMl: 0, goalMl: 2000 });
         }
     }
@@ -612,6 +634,7 @@ class PopupController {
         const btn = this.btnWaterUndo;
         try {
             const response = await this.sendWithRetry({ action: 'undoWater' }, 2);
+            console.log('[Water] Undo response:', response);
             if (response?.log) {
                 this.updateWaterUI(response.log);
                 if (btn) {
@@ -620,13 +643,14 @@ class PopupController {
                     setTimeout(() => { btn.classList.remove('water-added'); btn.textContent = '↩'; }, 600);
                 }
             } else if (response?.error) {
+                console.log('[Water] Undo error:', response.error);
                 if (btn) {
                     btn.textContent = '✗';
                     setTimeout(() => { btn.textContent = '↩'; }, 800);
                 }
             }
         } catch (e) {
-            console.warn('[Water] Undo failed:', e);
+            console.error('[Water] Undo failed:', e);
         }
     }
 
