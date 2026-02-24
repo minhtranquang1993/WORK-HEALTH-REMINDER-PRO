@@ -896,8 +896,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'addWater') {
         addWater(message.ml).then(log => {
             // Notification khi đạt mục tiêu
-            getSettings().then(settings => {
-                const goal = settings.waterGoalMl || 2000;
+            chrome.storage.local.get('settings').then(({ settings }) => {
+                const goal = (settings?.waterGoalMl) || 2000;
                 const pct = Math.round(log.totalMl * 100 / goal);
                 if (pct >= 100 && (log.totalMl - message.ml) < goal) {
                     showCustomNotification('🎉 Đạt mục tiêu nước!', `Đã uống đủ ${goal}ml hôm nay! Tuyệt vời!`);
@@ -1232,11 +1232,11 @@ async function ensureTodoToday() {
 
 async function getWaterLog() {
     const today = new Date().toDateString();
-    const data = await chrome.storage.local.get(['waterLog']);
+    const data = await chrome.storage.local.get(['waterLog', 'settings']);
     const log = data.waterLog || {};
+    const settings = data.settings || {};
     // Reset nếu sang ngày mới
     if (log.date !== today) {
-        const settings = await getSettings();
         const newLog = { date: today, totalMl: 0, entries: [], goalMl: settings.waterGoalMl || 2000 };
         await chrome.storage.local.set({ waterLog: newLog });
         return newLog;
@@ -1254,9 +1254,9 @@ async function addWater(ml) {
 }
 
 async function resetWaterToday() {
-    const settings = await getSettings();
+    const { settings } = await chrome.storage.local.get('settings');
     const today = new Date().toDateString();
-    const newLog = { date: today, totalMl: 0, entries: [], goalMl: settings.waterGoalMl || 2000 };
+    const newLog = { date: today, totalMl: 0, entries: [], goalMl: (settings?.waterGoalMl) || 2000 };
     await chrome.storage.local.set({ waterLog: newLog });
     return newLog;
 }
