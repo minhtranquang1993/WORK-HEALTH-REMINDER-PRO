@@ -1381,11 +1381,12 @@ class PopupController {
         }
     }
 
-    async toggleTodo(taskId) {
+    async toggleTodo(taskId, earlyComplete = false) {
         try {
             const response = await chrome.runtime.sendMessage({
                 action: 'toggleTodo',
-                taskId: taskId
+                taskId: taskId,
+                earlyComplete: earlyComplete
             });
 
             if (response && response.success) {
@@ -1505,12 +1506,13 @@ class PopupController {
                 return `
                 <div class="todo-item todo-scheduled ${task.completed ? 'is-completed' : ''}" data-id="${task.id}">
                     <div class="todo-checkbox-wrapper">
-                        <input type="checkbox" class="todo-checkbox" ${task.completed ? 'checked' : ''} disabled>
+                        <input type="checkbox" class="todo-checkbox" ${task.completed ? 'checked' : ''}>
                     </div>
                     <div class="todo-content">
                         <span class="todo-text">${this.escapeHtml(task.text)}</span>
                         <div class="todo-meta">
                             <span class="todo-tag">📅 ${dueLabel}</span>
+                            ${task.completedEarly ? `<span class="todo-tag todo-tag-early">⚡ Làm sớm</span>` : ''}
                         </div>
                     </div>
                     <button class="todo-delete-btn" title="Xóa">🗑️</button>
@@ -1540,6 +1542,20 @@ class PopupController {
                     e.stopPropagation();
                     item.classList.toggle('is-completed');
                     this.toggleTodo(id);
+                });
+            } else {
+                // Scheduled tasks: allow early complete
+                item.addEventListener('click', (e) => {
+                    if (e.target === deleteBtn || deleteBtn.contains(e.target) || e.target === checkbox) return;
+                    item.classList.toggle('is-completed');
+                    checkbox.checked = !checkbox.checked;
+                    this.toggleTodo(id, true);
+                });
+
+                checkbox.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    item.classList.toggle('is-completed');
+                    this.toggleTodo(id, true);
                 });
             }
 

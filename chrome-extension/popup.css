@@ -1558,6 +1558,12 @@ select:focus {
     border-radius: 4px;
 }
 
+.todo-tag-early {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
 .todo-delete-btn {
     background: transparent;
     border: none;
@@ -1623,8 +1629,16 @@ select:focus {
     pointer-events: auto;
 }
 
+.todo-item.todo-scheduled:hover {
+    opacity: 0.7;
+}
+
+.todo-item.todo-scheduled.is-completed {
+    opacity: 0.35;
+}
+
 .todo-item.todo-scheduled .todo-checkbox {
-    cursor: not-allowed;
+    cursor: pointer;
 }
 
 .todo-stats-toggle {

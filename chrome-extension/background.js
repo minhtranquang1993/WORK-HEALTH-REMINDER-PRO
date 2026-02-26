@@ -1115,7 +1115,7 @@ async function handleMessage(message) {
             return await handleTodoAddTask(message.task);
 
         case 'toggleTodo':
-            return await handleTodoToggleTask(message.taskId);
+            return await handleTodoToggleTask(message.taskId, message.earlyComplete);
 
         case 'deleteTodo':
             return await handleTodoDeleteTask(message.taskId);
@@ -1324,7 +1324,7 @@ async function performTodoDailyReset() {
             }
 
             if (shouldReset) {
-                return { ...task, completed: false, completedAt: null };
+                return { ...task, completed: false, completedAt: null, completedEarly: false };
             }
             return task; // Keep completed if not reset day
         });
@@ -1368,9 +1368,9 @@ async function handleTodoAddTask(task) {
     return { success: true, task: newTask };
 }
 
-async function handleTodoToggleTask(taskId) {
+async function handleTodoToggleTask(taskId, earlyComplete = false) {
     await ensureTodoToday();
-    const { todoTasks, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoSettings']);
+    const { todoTasks, todoHistory, todoSettings } = await chrome.storage.local.get(['todoTasks', 'todoHistory', 'todoSettings']);
 
     const taskIndex = todoTasks.tasks.findIndex(t => t.id === taskId);
     if (taskIndex === -1) return { success: false, error: "Task not found" };
@@ -1379,12 +1379,33 @@ async function handleTodoToggleTask(taskId) {
     task.completed = !task.completed;
     task.completedAt = task.completed ? Date.now() : null;
 
-    // Sort tasks: Incomplete first, then by priority, then by time
-    // But typically user wants list order stable or auto-sorted. 
-    // Let's keep array order but UI can sort. 
-    // Or we sort here? Let's just update data.
+    // If early complete: mark the flag so UI shows "⚡ Làm sớm" badge
+    if (earlyComplete && task.completed) {
+        task.completedEarly = true;
+    } else if (!task.completed) {
+        task.completedEarly = false;
+    }
 
     await chrome.storage.local.set({ todoTasks });
+
+    // Update today's history snapshot to reflect early-completed scheduled tasks
+    if (earlyComplete) {
+        const hist = todoHistory || {};
+        const todayStr = new Date().toDateString();
+        const existing = hist[todayStr] || { total: 0, completed: 0, percentage: 0 };
+
+        // Count all tasks (active + early-completed scheduled)
+        const allTasks = todoTasks.tasks;
+        const activeTasks = allTasks.filter(t => isTaskActiveToday(t));
+        const earlyCompletedScheduled = allTasks.filter(t => !isTaskActiveToday(t) && t.completedEarly);
+
+        const countTotal = activeTasks.length + earlyCompletedScheduled.length;
+        const countCompleted = activeTasks.filter(t => t.completed).length + earlyCompletedScheduled.length;
+        const percentage = countTotal > 0 ? Math.round((countCompleted / countTotal) * 100) : 0;
+
+        hist[todayStr] = { total: countTotal, completed: countCompleted, percentage };
+        await chrome.storage.local.set({ todoHistory: hist });
+    }
 
     // Toggle Streak Update
     await updateStreakStats(todoTasks, todoSettings);
