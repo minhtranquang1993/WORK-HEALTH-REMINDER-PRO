@@ -1,7 +1,11 @@
 // ========================================
 // Work Health Reminder PRO - Popup Script
-// Version 3.0
+// Version 3.2
+//
+// Logic thuần dùng chung với background qua lib/core.js (window.WHRCore).
 // ========================================
+
+const Core = window.WHRCore;
 
 class PopupController {
     constructor() {
@@ -10,7 +14,6 @@ class PopupController {
         this.loadSettings();
         this.loadTodoData();
         this.loadHolidays();
-        this.loadWaterData();
         this.startUpdating();
     }
 
@@ -72,11 +75,11 @@ class PopupController {
         this.settingTelegramChatId = document.getElementById('settingTelegramChatId');
         this.settingTelegramTime = document.getElementById('settingTelegramTime');
 
-        // Intervals
-        this.intervalWalk = document.getElementById('intervalWalk');
-        this.intervalWater = document.getElementById('intervalWater');
-        this.intervalEye = document.getElementById('intervalEye');
-        this.intervalPosture = document.getElementById('intervalPosture');
+        // Intervals — 9 input, id dạng interval_<key>
+        this.settingWaterPace = document.getElementById('settingWaterPace');
+        this.settingIdleSuppression = document.getElementById('settingIdleSuppression');
+        this.settingMeetingFocus = document.getElementById('settingMeetingFocus');
+        this.settingAdaptive = document.getElementById('settingAdaptive');
 
         // Settings buttons
         this.btnSaveSettings = document.getElementById('btnSaveSettings');
@@ -133,6 +136,16 @@ class PopupController {
 
         // YouTube update counter (to update less frequently)
         this.youtubeUpdateCounter = 0;
+
+        // Tab đang mở — dùng để chỉ poll YouTube khi thật sự đang xem tab đó
+        this.activeTab = 'timers';
+
+        // Snapshot getStatus gần nhất, để tick 1 giây không cần gửi message
+        this.lastStatus = null;
+        this.lastStatusAt = 0;
+
+        // Banner lý do bị chặn (idle / họp / nghỉ trưa...)
+        this.suppressBanner = document.getElementById('suppressBanner');
 
         // YouTube video duration (for seek calculation)
         this.youtubeVideoDuration = 0;
@@ -291,58 +304,78 @@ class PopupController {
     }
 
     switchTab(tabName) {
-        // Update tab buttons
+        this.activeTab = tabName;
+
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
-
-        // Update tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `tab-${tabName}`);
         });
 
-        if (tabName === 'todo') {
-            this.loadTodoData();
-        }
-        if (tabName === 'settings') {
-            this.loadHolidays();
-        }
+        if (tabName === 'todo') this.loadTodoData();
+        if (tabName === 'settings') this.loadHolidays();
+        if (tabName === 'youtube') this.updateYoutubeDisplay();
     }
 
     startUpdating() {
         this.updateDisplay();
-        // Update every second
-        setInterval(() => this.updateDisplay(), 1000);
+        // Tick mỗi giây CHỈ để vẽ lại đồng hồ + đếm ngược từ dữ liệu đã có.
+        // Bản cũ gọi getStatus mỗi giây, mà mỗi lần gọi lại ghi storage
+        // => ~1 write/giây và service worker không bao giờ ngủ.
+        setInterval(() => this.tickLocal(), 1000);
+        // Đồng bộ với background thưa hơn nhiều
+        setInterval(() => this.updateDisplay(), 15000);
+    }
+
+    /** Vẽ lại từ snapshot cuối, không gửi message. */
+    tickLocal() {
+        this.updateClock();
+        if (!this.lastStatus) return;
+
+        const elapsed = Math.floor((Date.now() - this.lastStatusAt) / 1000);
+        const timers = {};
+        for (const [key, val] of Object.entries(this.lastStatus.timers || {})) {
+            timers[key] = val == null ? null : Math.max(0, val - elapsed);
+        }
+        this.updateTimers(timers, this.lastStatus.suppressed);
+        this.updateFocusDisplay(this.lastStatus.state);
+        this.updatePomodoroDisplay(this.lastStatus.state, this.lastStatus.settings);
     }
 
     async updateDisplay() {
-        // Update time
         this.updateClock();
 
-        // Get status from background
         try {
             const response = await chrome.runtime.sendMessage({ action: 'getStatus' });
-            if (response) {
+            if (response && response.workStatus) {
+                this.lastStatus = response;
+                this.lastStatusAt = Date.now();
+
                 this.updateStatus(response.workStatus);
-                this.updateTimers(response.timers);
+                this.updateTimers(response.timers, response.suppressed);
                 this.updateProgress(response.settings);
                 this.updatePauseButton(response.settings.isPaused);
                 this.updateFocusDisplay(response.state);
                 this.updatePomodoroDisplay(response.state, response.settings);
+                if (response.water) {
+                    this.updateWaterUI({
+                        totalMl: response.water.totalMl,
+                        goalMl: response.water.goalMl
+                    });
+                }
             }
         } catch (e) {
-            console.log('Error getting status:', e);
-            // Fallback: show default status thay vì stuck "Đang kiểm tra..."
+            console.warn('[popup] getStatus:', e.message);
             if (this.statusText && this.statusText.textContent === 'Đang kiểm tra...') {
                 this.statusText.textContent = '⏳ Đang kết nối...';
-                // Retry sau 2 giây
                 setTimeout(() => this.updateDisplay(), 2000);
             }
         }
 
-        // Update YouTube (every 2 seconds to reduce load)
-        this.youtubeUpdateCounter++;
-        if (this.youtubeUpdateCounter % 2 === 0) {
+        // YouTube chỉ refresh khi đang ở tab YouTube — bản cũ poll mỗi 2s
+        // bất kể user đang xem tab nào.
+        if (this.activeTab === 'youtube') {
             this.updateYoutubeDisplay();
         }
     }
@@ -368,32 +401,46 @@ class PopupController {
     updateStatus(workStatus) {
         this.statusBadge.className = 'status-badge';
 
-        if (workStatus.status === 'paused') {
-            this.statusBadge.classList.add('paused');
-        } else if (workStatus.status === 'lunch') {
-            this.statusBadge.classList.add('lunch');
-        } else if (workStatus.status === 'ended' || workStatus.status === 'before' || workStatus.status === 'weekend') {
-            this.statusBadge.classList.add('ended');
-        } else if (workStatus.status === 'holiday') {
-            this.statusBadge.classList.add('holiday');
-        } else if (workStatus.status === 'focus') {
-            this.statusBadge.classList.add('focus');
-        } else if (workStatus.status.startsWith('pomodoro')) {
-            this.statusBadge.classList.add('pomodoro');
-        }
+        const cls = {
+            paused: 'paused', notifications_off: 'paused',
+            lunch: 'lunch', holiday: 'holiday',
+            weekend: 'ended', before_work: 'ended', after_work: 'ended',
+            focus: 'focus', idle: 'ended', locked: 'ended', meeting: 'focus'
+        }[workStatus.status];
+        if (cls) this.statusBadge.classList.add(cls);
+        else if (workStatus.status.startsWith('pomodoro')) this.statusBadge.classList.add('pomodoro');
 
         this.statusText.textContent = workStatus.label;
+
+        // Hiện rõ LÝ DO đang không nhắc, để suppression không bao giờ
+        // "im lặng thất bại" — user luôn biết vì sao chưa có nhắc nhở.
+        if (this.suppressBanner) {
+            if (workStatus.suppressed) {
+                this.suppressBanner.textContent = `Đang tạm không nhắc — ${workStatus.label}`;
+                this.suppressBanner.classList.remove('hidden');
+            } else {
+                this.suppressBanner.classList.add('hidden');
+            }
+        }
     }
 
-    updateTimers(timers) {
+    /**
+     * Đếm ngược lấy từ chrome.alarms qua background. Khi đang bị chặn thì
+     * hiện dấu gạch thay vì con số, vì con số đó sẽ là lời nói dối:
+     * alarm vẫn chạy nhưng thông báo bị chặn ở tầng gửi.
+     */
+    updateTimers(timers, suppressed) {
         if (!timers) return;
-
-        this.walkTimer.textContent = this.formatTime(timers.walk);
-        this.waterTimer.textContent = this.formatTime(timers.water);
-        this.eyeTimer.textContent = this.formatTime(timers.eye_20_20_20);
-        this.blinkTimer.textContent = this.formatTime(timers.blink);
-        this.postureTimer.textContent = this.formatTime(timers.posture);
-        this.neckTimer.textContent = this.formatTime(timers.neck_stretch);
+        const set = (el, key) => {
+            if (!el) return;
+            el.textContent = suppressed ? '--:--' : this.formatTime(timers[key]);
+        };
+        set(this.walkTimer, 'walk');
+        set(this.waterTimer, 'water');
+        set(this.eyeTimer, 'eye_20_20_20');
+        set(this.blinkTimer, 'blink');
+        set(this.postureTimer, 'posture');
+        set(this.neckTimer, 'neck_stretch');
     }
 
     formatTime(seconds) {
@@ -404,32 +451,11 @@ class PopupController {
     }
 
     updateProgress(settings) {
+        // Dùng chung công thức với background (Core) để 2 bên không lệch
         const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-        const workStart = settings.workStart.hour * 60 + settings.workStart.minute;
-        const lunchStart = settings.lunchStart.hour * 60 + settings.lunchStart.minute;
-        const lunchEnd = settings.lunchEnd.hour * 60 + settings.lunchEnd.minute;
-        const workEnd = settings.workEnd.hour * 60 + settings.workEnd.minute;
-
-        // Total work minutes (excluding lunch)
-        const totalWorkMinutes = (lunchStart - workStart) + (workEnd - lunchEnd);
-
-        let workedMinutes = 0;
-
-        if (currentMinutes < workStart) {
-            workedMinutes = 0;
-        } else if (currentMinutes < lunchStart) {
-            workedMinutes = currentMinutes - workStart;
-        } else if (currentMinutes < lunchEnd) {
-            workedMinutes = lunchStart - workStart;
-        } else if (currentMinutes < workEnd) {
-            workedMinutes = (lunchStart - workStart) + (currentMinutes - lunchEnd);
-        } else {
-            workedMinutes = totalWorkMinutes;
-        }
-
-        const percent = Math.min(100, Math.max(0, (workedMinutes / totalWorkMinutes) * 100));
+        const total = Core.workMinutesToday(settings, now);
+        const worked = Core.workMinutesElapsed(settings, now);
+        const percent = total > 0 ? Math.min(100, Math.max(0, (worked / total) * 100)) : 0;
 
         this.progressFill.style.width = `${percent}%`;
         this.workPercent.textContent = `${Math.round(percent)}%`;
@@ -563,7 +589,6 @@ class PopupController {
     // ============================================
 
     async addWater(ml) {
-        // Visual feedback ngay lập tức
         const btn = document.getElementById(`btnWater${ml}`);
         if (btn) {
             btn.classList.add('water-added');
@@ -574,20 +599,11 @@ class PopupController {
             }, 600);
         }
 
-        // Optimistic UI update (update ngay, không chờ background)
-        const goal = parseInt(this.waterAmount?.textContent?.match(/\d+$/)?.[0]) || 2000;
-        const currentMatch = this.waterAmount?.textContent?.match(/^(\d+)/);
-        const currentMl = parseInt(currentMatch?.[1]) || 0;
-        const newTotal = currentMl + ml;
-        const pct = Math.min(100, Math.round(newTotal * 100 / goal));
-        this.updateWaterUI({ totalMl: newTotal, goalMl: goal });
-
-        // Send to background with retry
         try {
             const response = await this.sendWithRetry({ action: 'addWater', ml }, 2);
             if (response?.log) this.updateWaterUI(response.log);
         } catch (e) {
-            console.warn('[Water] Background unreachable, optimistic update kept');
+            console.warn('[Water] không gửi được:', e.message);
         }
     }
 
@@ -626,7 +642,6 @@ class PopupController {
         const btn = this.btnWaterUndo;
         try {
             const response = await this.sendWithRetry({ action: 'undoWater' }, 2);
-            console.log('[Water] Undo response:', response);
             if (response?.log) {
                 this.updateWaterUI(response.log);
                 if (btn) {
@@ -635,14 +650,14 @@ class PopupController {
                     setTimeout(() => { btn.classList.remove('water-added'); btn.textContent = '↩'; }, 600);
                 }
             } else if (response?.error) {
-                console.log('[Water] Undo error:', response.error);
+                this.showToast('⚠️ ' + response.error);
                 if (btn) {
                     btn.textContent = '✗';
                     setTimeout(() => { btn.textContent = '↩'; }, 800);
                 }
             }
         } catch (e) {
-            console.error('[Water] Undo failed:', e);
+            console.warn('[Water] undo:', e.message);
         }
     }
 
@@ -664,29 +679,24 @@ class PopupController {
         if (this.waterProgressFill) this.waterProgressFill.style.background = bg;
     }
 
-    async loadWaterData() {
-        try {
-            const response = await this.sendWithRetry({ action: 'getWaterLog' }, 2);
-            if (response?.log) this.updateWaterUI(response.log);
-        } catch (e) {
-            console.warn('[Water] Could not load water data:', e);
-        }
-    }
-
     async testTelegram() {
-        // Save settings first to ensure background has latest tokens
-        await this.saveSettings();
-
+        // Gửi token/chat id TRỰC TIẾP, không gọi saveSettings() nữa.
+        // Bug cũ: nút Test gọi saveSettings() -> ghi đè toàn bộ interval và
+        // re-phase mọi alarm, dù user chỉ muốn thử gửi tin nhắn.
         try {
             this.btnTestTelegram.textContent = '⏳ Đang gửi...';
             this.btnTestTelegram.disabled = true;
 
-            const response = await chrome.runtime.sendMessage({ action: 'testTelegram' });
+            const response = await chrome.runtime.sendMessage({
+                action: 'testTelegram',
+                botToken: this.settingTelegramToken.value.trim(),
+                chatId: this.settingTelegramChatId.value.trim()
+            });
 
             if (response && response.success) {
                 this.showToast('✅ Đã gửi tin nhắn Telegram!');
             } else {
-                this.showToast('❌ Lỗi: ' + (response.error || 'Unknown error'));
+                this.showToast('❌ ' + ((response && response.error) || 'Lỗi không rõ'));
             }
         } catch (e) {
             console.log('Error testing telegram:', e);
@@ -823,10 +833,13 @@ class PopupController {
         });
     }
 
+    /**
+     * Escape dùng chung với background (Core.escapeHtml) — phủ cả `"` và `'`
+     * nên an toàn khi nhúng vào attribute. Bản cũ dùng textContent->innerHTML
+     * không escape dấu ngoặc kép, làm title video YouTube phá được attribute.
+     */
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text || '';
-        return div.innerHTML;
+        return Core.escapeHtml(text);
     }
 
     updateYoutubeControls(info) {
@@ -1107,7 +1120,7 @@ class PopupController {
 
             return `
                 <div class="holiday-item ${statusClass}">
-                    <span class="holiday-name">🎌 ${h.name}</span>
+                    <span class="holiday-name">🎌 ${this.escapeHtml(h.name)}</span>
                     <span class="holiday-date">${dateDisplay}</span>
                     ${badge}
                 </div>
@@ -1239,21 +1252,28 @@ class PopupController {
                 // Water
                 if (this.settingWaterGoal) this.settingWaterGoal.value = s.waterGoalMl || 2000;
                 if (this.settingWaterCup) this.settingWaterCup.value = s.waterCupMl || 200;
+                if (this.settingWaterPace) this.settingWaterPace.checked = s.waterPaceMode !== false;
+
+                // Automation
+                if (this.settingIdleSuppression) this.settingIdleSuppression.checked = s.idleSuppression !== false;
+                if (this.settingMeetingFocus) this.settingMeetingFocus.checked = s.meetingAutoFocus !== false;
+                if (this.settingAdaptive) this.settingAdaptive.checked = !!s.adaptiveIntervals;
 
                 // Telegram
                 this.settingTelegramToken.value = s.telegramBotToken || '';
                 this.settingTelegramChatId.value = s.telegramChatId || '';
                 this.settingTelegramTime.value = this.formatTimeValue(s.telegramReportTime || { hour: 17, minute: 0 });
 
-                // Intervals
-                if (s.intervals) {
-                    this.intervalWalk.value = s.intervals.walk || 30;
-                    this.intervalWater.value = s.intervals.water || 45;
-                    this.intervalEye.value = s.intervals.eye_20_20_20 || 20;
-                    this.intervalPosture.value = s.intervals.posture || 45;
+                // Intervals — cả 9 loại, fallback về Core.DEFAULT_INTERVALS
+                // (nguồn sự thật duy nhất) thay vì số viết tay như bản cũ.
+                const ivl = Core.normalizeIntervals(s.intervals);
+                for (const key of Core.INTERVAL_KEYS) {
+                    const el = document.getElementById('interval_' + key);
+                    if (el) el.value = ivl[key];
                 }
 
                 this.updateWeekendModeUI();
+                this.updateNotificationBudget(s);
             }
         } catch (e) {
             console.log('Error loading settings:', e);
@@ -1289,6 +1309,16 @@ class PopupController {
 
     async saveSettings() {
         try {
+            // Đọc TẤT CẢ 9 interval từ UI. Bản cũ hardcode 5 giá trị
+            // (blink:15, neck:60, toilet:60, eye_exercise:90, breathing:120)
+            // nên mỗi lần bấm Save là ghi đè im lặng cài đặt của user.
+            const intervals = {};
+            for (const key of Core.INTERVAL_KEYS) {
+                const el = document.getElementById('interval_' + key);
+                const raw = el ? parseInt(el.value, 10) : NaN;
+                intervals[key] = Number.isFinite(raw) ? raw : Core.DEFAULT_INTERVALS[key];
+            }
+
             const settings = {
                 workStart: this.parseTimeValue(this.settingWorkStart.value),
                 workEnd: this.parseTimeValue(this.settingWorkEnd.value),
@@ -1305,29 +1335,41 @@ class PopupController {
                 notificationEnabled: this.settingNotification.checked,
                 waterGoalMl: parseInt(this.settingWaterGoal?.value) || 2000,
                 waterCupMl: parseInt(this.settingWaterCup?.value) || 200,
+                waterPaceMode: this.settingWaterPace ? this.settingWaterPace.checked : true,
+                idleSuppression: this.settingIdleSuppression ? this.settingIdleSuppression.checked : true,
+                meetingAutoFocus: this.settingMeetingFocus ? this.settingMeetingFocus.checked : true,
+                adaptiveIntervals: this.settingAdaptive ? this.settingAdaptive.checked : false,
                 telegramBotToken: this.settingTelegramToken.value.trim(),
                 telegramChatId: this.settingTelegramChatId.value.trim(),
                 telegramReportTime: this.parseTimeValue(this.settingTelegramTime.value),
-                intervals: {
-                    walk: parseInt(this.intervalWalk.value) || 30,
-                    water: parseInt(this.intervalWater.value) || 45,
-                    toilet: 60,
-                    eye_20_20_20: parseInt(this.intervalEye.value) || 20,
-                    blink: 15,
-                    posture: parseInt(this.intervalPosture.value) || 45,
-                    neck_stretch: 60,
-                    eye_exercise: 90,
-                    breathing: 120
-                },
+                intervals: Core.normalizeIntervals(intervals),
                 isConfigured: true
             };
 
-            await chrome.runtime.sendMessage({ action: 'updateSettings', settings });
-            this.showToast('💾 Đã lưu cài đặt!');
+            const res = await chrome.runtime.sendMessage({ action: 'updateSettings', settings });
+            if (res && res.success) {
+                this.showToast('💾 Đã lưu cài đặt!');
+                this.updateNotificationBudget(res.settings);
+            } else {
+                this.showToast('❌ Lỗi khi lưu cài đặt');
+            }
         } catch (e) {
             console.log('Error saving settings:', e);
             this.showToast('❌ Lỗi khi lưu cài đặt');
         }
+    }
+
+    /** Cho user thấy ngay chi phí ồn của cấu hình đang chọn. */
+    updateNotificationBudget(settings) {
+        const el = document.getElementById('notificationBudget');
+        if (!el || !settings) return;
+        const minutes = Core.workMinutesToday(settings, new Date()) || 480;
+        const action = Core.countDailyNotifications(settings.intervals, minutes, { actionOnly: true });
+        const micro = Core.countDailyNotifications(settings.intervals, minutes, { microOnly: true });
+        const over = action > Core.ACTION_NOTIFICATION_BUDGET;
+        el.textContent = `≈ ${action} thông báo cần hành động + ${micro} nhắc mắt 20-20-20 mỗi ngày`
+            + (over ? ` — vượt ngưỡng ${Core.ACTION_NOTIFICATION_BUDGET}, dễ bị bỏ qua` : '');
+        el.classList.toggle('budget-warn', over);
     }
 
     async resetSettings() {
@@ -1619,37 +1661,32 @@ class PopupController {
     renderWeeklyChart(history) {
         if (!this.statsChartContainer) return;
 
-        // Get last 7 days
+        // 7 ngày gần nhất. Key là "YYYY-MM-DD" theo giờ ĐỊA PHƯƠNG và nhãn
+        // thứ được dựng từ Date(y, m-1, d) — không parse chuỗi ISO, vì
+        // new Date("2026-08-23") bị hiểu là UTC và lệch 1 ngày ở múi giờ âm.
         const days = [];
-        const date = new Date();
+        const today = new Date();
         for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(date.getDate() - i);
-            days.push(d.toDateString());
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+            days.push({ key: Core.toLocalDateKey(d), date: d });
         }
 
-        const chartHtml = days.map((dayStr, index) => {
-            const isToday = index === 6;
-            const data = history[dayStr] || { total: 0, completed: 0, percentage: 0 };
-            const height = data.percentage * 0.8; // Max height 80px (scaled by 0.8 to fit bar container)
+        const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-            // Simple day label (e.g. Mon, Tue)
-            // Use short day name in Vietnamese if possible, or simple date
-            // Let's use weekday number or short name
-            const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-            const dayLabel = weekdays[new Date(dayStr).getDay()];
+        this.statsChartContainer.innerHTML = days.map((day, index) => {
+            const isToday = index === 6;
+            const data = (history && history[day.key]) || { total: 0, completed: 0, percentage: 0 };
+            const tip = `${data.completed}/${data.total} (${data.percentage}%)`;
 
             return `
                 <div class="chart-column ${isToday ? 'today-column' : ''}">
-                    <div class="chart-bar-bg" title="${data.completed}/${data.total} (${data.percentage}%)">
-                        <div class="chart-bar-fill" style="height: ${data.percentage}%"></div>
+                    <div class="chart-bar-bg" title="${this.escapeHtml(tip)}">
+                        <div class="chart-bar-fill" style="height: ${Number(data.percentage) || 0}%"></div>
                     </div>
-                    <span class="chart-label">${dayLabel}</span>
+                    <span class="chart-label">${weekdays[day.date.getDay()]}</span>
                 </div>
             `;
         }).join('');
-
-        this.statsChartContainer.innerHTML = chartHtml;
     }
 }
 

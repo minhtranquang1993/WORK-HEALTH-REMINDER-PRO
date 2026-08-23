@@ -1,272 +1,231 @@
 # 🏃 Work Health Reminder PRO
 
-> Ứng dụng nhắc nhở sức khỏe thông minh khi làm việc — bảo vệ mắt, nhắc uống nước, tự động dừng khi họp.  
-> Hỗ trợ **macOS** và **Windows**. Hoàn toàn offline, không cần tài khoản.
+> Chrome Extension nhắc nhở sức khỏe khi làm việc — bảo vệ mắt, nhắc uống nước,
+> **tự động tắt nhắc khi bạn rời máy hoặc đang họp**.
+> Chạy trên **Windows / macOS / Linux**, hoàn toàn offline, không cần tài khoản.
+
+**Extension là sản phẩm chính.** Các file Python và bản web trong repo là demo legacy — xem [Trạng thái các bản](#-trạng-thái-các-bản).
 
 ---
 
 ## 📋 Mục lục
 
 - [Tính năng](#-tính-năng)
-- [Cài đặt & Chạy app](#-cài-đặt--chạy-app)
-- [Hướng dẫn sử dụng](#-hướng-dẫn-sử-dụng)
+- [Cài đặt](#-cài-đặt)
+- [Tự động hoá](#-tự-động-hoá)
+- [Bàn phím tắt](#-bàn-phím-tắt)
 - [Cài đặt Telegram](#-cài-đặt-telegram-nhận-báo-cáo-todo)
-- [Chrome Extension](#-chrome-extension)
+- [Ngân sách thông báo](#-ngân-sách-thông-báo)
+- [Phát triển & test](#-phát-triển--test)
+- [Trạng thái các bản](#-trạng-thái-các-bản)
+- [Bảo mật](#-bảo-mật)
 - [Câu hỏi thường gặp](#-câu-hỏi-thường-gặp)
 
 ---
 
 ## ✨ Tính năng
 
-### ⏱️ Nhắc nhở thông minh (dựa theo nghiên cứu khoa học)
+### ⏱️ Nhắc nhở định kỳ (mặc định đã hiệu chỉnh để không spam)
 
 | Chu kỳ | Nhắc nhở | Nguồn |
 |--------|----------|-------|
-| 30 phút | 🚶 Đứng dậy đi bộ | Columbia University |
-| 45 phút | 💧 Uống nước | WHO Hydration Guidelines |
 | 20 phút | 👁️ Nhìn xa 6m trong 20 giây (20-20-20) | American Academy of Ophthalmology |
-| 15 phút | 😊 Nhắc chớp mắt | Dry Eye Research |
-| 20 phút | 🪑 Kiểm tra tư thế ngồi | Cornell 20-8-2 Rule |
-| 30 phút | 🧘 Giãn cơ cổ vai | Ergonomics Guidelines |
-| 60 phút | 👀 Bài tập mắt | AAO Guidelines |
-| 60 phút | 🌬️ Hít thở sâu | Mindfulness Research |
+| 60 phút | 🚶 Đứng dậy đi bộ | Columbia University |
+| 60 phút | 💧 Uống nước (theo tiến độ, xem bên dưới) | WHO Hydration Guidelines |
+| 90 phút | 🪑 Kiểm tra tư thế ngồi | Cornell 20-8-2 Rule |
+| 90 phút | 😊 Nhắc chớp mắt | Dry Eye Research |
+| 90 phút | 🧘 Giãn cơ cổ vai | Ergonomics Guidelines |
+| 120 phút | 🚻 Đi toilet | — |
+| 180 phút | 👀 Bài tập mắt | AAO Guidelines |
+| 180 phút | 🌬️ Hít thở sâu | Mindfulness Research |
 
-### 💧 Water Tracker
-- Theo dõi lượng nước uống theo ngày
-- Mục tiêu mặc định **2000ml/ngày** (có thể tự chỉnh)
-- Progress bar hiển thị % đã đạt
-- Tự động reset mỗi ngày mới
+Cả 9 chu kỳ đều **tự chỉnh được** trong ⚙️ Settings. Popup hiển thị luôn số thông báo/ngày mà cấu hình hiện tại sẽ tạo ra.
 
-### 🎯 Focus Mode *(mới)*
-- Tắt toàn bộ nhắc nhở trong 15 / 30 / 45 / 60 phút
-- Tự động bật lại sau khi hết giờ focus
+> **Vì sao chớp mắt là 90 phút, không phải 2 phút?** 1–2 phút là *nhịp chớp mắt sinh lý*, không phải nhịp gửi thông báo. Bản cũ đặt 2 phút → khoảng **240 thông báo/ngày làm**, và kết quả thực tế là người dùng tắt hết thông báo.
 
-### 🏖️ Chế độ nghỉ phép *(mới)*
-- Đặt ngày bắt đầu & kết thúc nghỉ → app tự dừng hoàn toàn
-- Phù hợp khi đi công tác, nghỉ phép dài ngày
+### 🔔 Nhắc nhở có nút bấm
+Mỗi thông báo có tối đa 2 nút: **✅ Đã làm**, **⏰ +5 phút**, và với nước là **💧 +1 ly** — ghi nhận ngay, không cần mở popup.
 
-### 🎌 Ngày lễ *(mới)*
-- Tích hợp sẵn lịch nghỉ lễ Việt Nam 2025–2026
-- Tự thêm ngày nghỉ tùy chỉnh (công ty, cá nhân)
-- App tự dừng vào ngày lễ, không cần tắt thủ công
+### 💧 Water Tracker theo tiến độ
+- Mục tiêu mặc định **2000ml/ngày** (tự chỉnh)
+- Chỉ nhắc khi bạn **đang tụt so với tiến độ ngày**, thay vì nhắc cứng theo giờ
+- Tự reset mỗi ngày, có nút Undo
 
-### 📝 Todo & Báo cáo Telegram *(mới)*
-- Quản lý task trong ngày (Chrome Extension)
-- Tự động gửi báo cáo tổng kết cuối ngày qua Telegram
+### 🎯 Focus Mode & 🍅 Pomodoro
+Tắt nhắc nhở 15/30/45/60 phút, tự bật lại. Focus Mode cũng tự pause video YouTube đang phát.
 
-### 🍅 Pomodoro Timer
-- Chế độ tập trung 25 phút / nghỉ 5 phút
-- Tự động đếm số Pomodoro hoàn thành trong ngày
+### 🏖️ Nghỉ phép, 🎌 Ngày lễ
+Lịch nghỉ lễ Việt Nam tới 2027 + tự thêm ngày nghỉ riêng. App tự dừng vào ngày lễ.
+
+### 📝 Todo & Báo cáo Telegram
+Quản lý task trong ngày, streak, thống kê 7 ngày. Báo cáo cuối ngày gồm todo + **% nước + số Pomodoro**. Nếu Chrome tắt lúc tới giờ, báo cáo được **gửi bù** khi mở lại.
 
 ---
 
-## 🚀 Cài đặt & Chạy app
-
-### ✅ Cách đơn giản nhất — Double-click (không cần biết code)
-
-**macOS:**
-1. Tải source code về → giải nén
-2. Double-click file **`Start_macOS.command`**
-3. App tự cài thư viện nếu cần → icon 🏃 xuất hiện trên menu bar
-
-> Lần đầu chạy macOS có thể hỏi permission → click **Open** là được
-
-**Windows:**
-1. Tải source code về → giải nén
-2. Double-click file **`Start_Windows.bat`**
-3. App tự cài thư viện nếu cần → chạy trong Terminal
-
----
-
-### 🔧 Cách thủ công (cho người dùng Terminal)
-
-**Yêu cầu:** Python 3.6+
-
-**macOS:**
-```bash
-pip3 install rumps
-python3 menubar_app.py
-```
-
-**Windows:**
-```bash
-pip install win10toast
-python reminder_pro.py
-```
-
----
-
-## 📖 Hướng dẫn sử dụng
-
-### macOS — Menu Bar App
-
-Sau khi chạy, click vào icon 🏃 trên menu bar để mở:
-
-```
-🏃 Menu Bar
-├── 🟢 Đang làm việc
-├── ⏱️ Nhắc tiếp: 💧 Nước — 12 phút
-│
-├── ⏸️ Tạm dừng
-├── 🎯 Focus Mode          ← Tắt nhắc nhở 15/30/45/60 phút
-├── 🍅 Pomodoro
-│
-├── 💧 Nước: 600/2000ml    ← Water Tracker
-│   ├── ✅ Uống 200ml
-│   ├── ✏️ Uống lượng khác...
-│   └── 🔄 Reset hôm nay
-│
-├── 🏖️ Chế độ nghỉ phép    ← Tạm dừng khi nghỉ/công tác
-├── 🎌 Ngày lễ             ← Lịch lễ VN + ngày nghỉ tùy chỉnh
-├── 📱 Telegram            ← Nhận báo cáo Todo cuối ngày
-├── 📺 YouTube
-├── 💪 Bài tập ngay
-│
-└── ⚙️ Cài đặt
-    ├── 📅 Giờ làm việc
-    ├── ⏱️ Thời gian nhắc   ← Tùy chỉnh chu kỳ
-    ├── 💧 Cài đặt nước     ← Mục tiêu & kích thước ly
-    └── 🔄 Đặt lại mặc định
-```
-
----
-
-## 📱 Cài đặt Telegram (Nhận báo cáo Todo)
-
-Tính năng này gửi báo cáo tổng kết Todo cuối ngày vào Telegram của bạn.
-
-### Bước 1 — Tạo Bot Telegram
-
-1. Mở Telegram → tìm **@BotFather**
-2. Gửi lệnh `/newbot`
-3. Đặt tên bot (ví dụ: `My Health Bot`)
-4. Copy **Bot Token** (dạng `123456789:AAHxx...`)
-
-### Bước 2 — Lấy Chat ID của bạn
-
-1. Mở Telegram → tìm **@userinfobot**
-2. Gửi bất kỳ tin nhắn nào
-3. Bot trả về **ID** của bạn (ví dụ: `123456789`)
-
-### Bước 3 — Nhập vào app
-
-**macOS Menu Bar:**
-> Click 🏃 → 📱 Telegram → 🔑 Cài đặt Bot Token → Nhập token + chat ID → OK  
-> Bấm **📢 Test gửi tin nhắn** để kiểm tra
-
-**Chrome Extension:**
-> ⚙️ Settings → 📱 Telegram Integration → Nhập Bot Token + Chat ID → **Test thông báo** → Save
-
----
-
-## 🌐 Chrome Extension
-
-Hoạt động trên cả **macOS và Windows**, không cần cài Python.
-
-### Cài đặt
+## 🚀 Cài đặt
 
 1. Mở Chrome → vào `chrome://extensions/`
 2. Bật **Developer mode** (góc trên phải)
 3. Bấm **Load unpacked** → chọn thư mục `chrome-extension/`
-4. Icon xuất hiện trên thanh công cụ Chrome ✅
+4. Icon xuất hiện trên thanh công cụ ✅
 
 ### Các tab trong Extension
 
 | Tab | Chức năng |
 |-----|-----------|
 | ⏱️ Timer | Countdown nhắc nhở + 💧 Water Tracker |
-| 📝 Todo | Quản lý task trong ngày |
-| 🎯 Focus | Focus Mode + Pomodoro |
 | 📺 YouTube | Điều khiển YouTube đang phát |
-| ⚙️ Settings | Giờ làm, Telegram, Water goal... |
+| 🎯 Focus | Focus Mode + Pomodoro |
+| 📝 Todo | Quản lý task, streak, thống kê tuần |
+| ⚙️ Settings | Giờ làm, 9 chu kỳ nhắc, tự động hoá, Telegram |
 
 ---
 
-## 🔧 Tùy chỉnh nâng cao
+## 🤖 Tự động hoá
 
-### Chỉnh chu kỳ nhắc nhở
+Bật/tắt trong ⚙️ Settings → **🤖 Tự động**:
 
-**macOS:** ⚙️ Cài đặt → ⏱️ Thời gian nhắc → Chỉnh từng mục  
-**Chrome Extension:** ⚙️ Settings → Intervals
+| Tính năng | Mặc định | Cách hoạt động |
+|---|---|---|
+| 💤 **Tắt nhắc khi rời máy** | Bật | Dùng `chrome.idle`: không nhắc khi bạn rời máy ≥ 5 phút hoặc máy đang khoá |
+| 📞 **Tự tắt nhắc khi đang họp** | Bật | Phát hiện tab Meet / Zoom / Teams / Webex / Whereby **đang phát tiếng** → tạm tắt nhắc, tự bật lại khi hết. Không cần calendar, không cần OAuth, không cần quyền mới |
+| 💧 **Nhắc nước theo tiến độ** | Bật | Chỉ nhắc khi tụt so với tiến độ ngày, thay vì nhắc cứng |
+| 📉 **Tự giãn nhắc bị bỏ qua** | Tắt | Nhắc nào bị tắt liên tiếp 3 lần sẽ tự giãn ra (trần = 2× mặc định, không bao giờ thành "im lặng") |
 
-### Chỉnh mục tiêu nước
+Khi nhắc nhở đang bị tạm tắt, popup **luôn hiện rõ lý do** (đang họp / rời máy / nghỉ trưa / ngoài giờ / ngày lễ...) — để không bao giờ có chuyện "sao không thấy nhắc gì" mà không rõ nguyên nhân.
 
-**macOS:** ⚙️ Cài đặt → 💧 Cài đặt nước → Sửa mục tiêu + kích thước ly  
-**Chrome Extension:** ⚙️ Settings → 💧 Water Tracker
+---
 
-### Thêm ngày nghỉ tùy chỉnh
+## ⌨️ Bàn phím tắt
 
-**macOS:** Click 🏃 → 🎌 Ngày lễ → ➕ Thêm ngày nghỉ → Nhập tên + ngày bắt đầu/kết thúc
+| Tổ hợp | Chức năng |
+|---|---|
+| `Alt+Shift+W` | Uống thêm 1 ly nước |
+| `Alt+Shift+F` | Bật/tắt Focus Mode 30 phút |
+| `Alt+Shift+P` | Bật/tắt Pomodoro |
+| `Alt+Shift+S` | Tạm dừng/tiếp tục nhắc nhở |
 
-### Đặt nghỉ phép / công tác
+Đổi tổ hợp tại `chrome://extensions/shortcuts`.
 
-**macOS:** Click 🏃 → 🏖️ Chế độ nghỉ phép → 📅 Đặt ngày nghỉ → Nhập ngày
+---
+
+## 📱 Cài đặt Telegram (Nhận báo cáo Todo)
+
+### Bước 1 — Tạo Bot
+1. Mở Telegram → tìm **@BotFather** → gửi `/newbot`
+2. Đặt tên bot → copy **Bot Token** (dạng `123456789:AAHxx...`)
+
+### Bước 2 — Lấy Chat ID
+1. Tìm **@userinfobot** → gửi tin nhắn bất kỳ
+2. Bot trả về **ID** của bạn
+
+### Bước 3 — Nhập vào extension
+> ⚙️ Settings → 📱 Telegram Integration → nhập Bot Token + Chat ID → **📢 Test thông báo** → **💾 Lưu cài đặt**
+
+Nút Test gửi thử ngay mà **không** thay đổi cài đặt nào khác.
+
+> **Bot Token chỉ lưu trên máy này** (`storage.local`), không đồng bộ lên tài khoản Google.
+
+---
+
+## 📊 Ngân sách thông báo
+
+Nhắc nhở được chia 2 nhóm ngân sách riêng:
+
+- **Micro** (20-20-20): tần suất cao nhưng gần như không tốn công → 24 lần/ngày làm 8h
+- **Cần hành động** (đứng dậy, uống nước, giãn cơ...): trần **40 lần/ngày**, hiện tại mặc định là 39
+
+Khi bạn chỉnh chu kỳ trong Settings, dòng bên dưới lưới interval báo ngay tổng số thông báo/ngày và cảnh báo nếu vượt ngưỡng.
+
+---
+
+## 🧪 Phát triển & test
+
+```bash
+npm test          # 145 test: logic lõi + service worker
+npm run test:core # chỉ logic thuần (lib/core.js)
+npm run test:bg   # chỉ service worker (chrome API được giả lập)
+npm run check     # kiểm tra syntax toàn bộ + manifest
+```
+
+Kiến trúc:
+
+```
+chrome-extension/
+├── lib/core.js          ← TOÀN BỘ logic thuần, không dùng chrome.* → test được
+├── background.js        ← service worker: chỉ lo chrome API
+├── popup.js / popup.html / popup.css
+├── youtube-content.js
+└── manifest.json
+
+tests/
+├── core.test.js         ← 78 test cho logic thuần
+├── background.test.js   ← 67 test tích hợp qua chrome stub
+└── helpers/chrome-stub.js
+```
+
+`lib/core.js` được **dùng chung** giữa popup và service worker, nên hai bên không thể lệch nhau về luật giờ làm, ngày lễ, hay điều kiện chặn nhắc nhở.
+
+---
+
+## 📦 Trạng thái các bản
+
+| Đường dẫn | Trạng thái |
+|---|---|
+| `chrome-extension/` | ✅ **Được hỗ trợ** — sản phẩm chính |
+| `menubar_app.py` | 🟡 Bản macOS menu bar, còn dùng được |
+| `reminder_pro.py`, `reminder_gui.py`, `reminder.py` | ⚠️ **Legacy, không hỗ trợ** — bản terminal/GUI cũ |
+| `index.html` + `app.js` + `styles.css` | ⚠️ **Legacy, không hỗ trợ** — demo web cũ |
+
+Các bản legacy vẫn chạy nhưng **không nhận sửa lỗi và không có test**. Mọi tính năng mới chỉ làm trên extension.
+
+### macOS Menu Bar App (nếu muốn dùng)
+
+```bash
+pip3 install rumps
+python3 menubar_app.py
+```
+
+Hoặc double-click `Start_macOS.command`.
+
+---
+
+## 🔒 Bảo mật
+
+- **Bot Token Telegram** lưu ở `chrome.storage.local`, chỉ trên máy này, không sync.
+- **Cầu nối localhost**: extension gửi thông tin video YouTube sang menubar app qua `http://localhost:9876`. Endpoint này đã được siết: chỉ nhận request từ `chrome-extension://` (kiểm qua header `X-WHR-Source` và `Origin`), không còn `Access-Control-Allow-Origin: *` như trước — website thường không đọc được bạn đang xem gì.
+- Extension **không gửi dữ liệu ra internet**, trừ khi bạn tự bật Telegram.
+- Quyền `tabs` được dùng để phát hiện họp và điều khiển YouTube. Quyền `idle` không hiện cảnh báo khi cài.
 
 ---
 
 ## ❓ Câu hỏi thường gặp
 
-**Q: Double-click `Start_macOS.command` không mở được / bị chặn?**  
-macOS tự động block file tải từ internet. Có 2 cách fix:
+**Q: Sao không thấy nhắc nhở nào?**
+→ Mở popup, dòng banner phía trên sẽ ghi rõ lý do (đang họp / rời máy / nghỉ trưa / ngoài giờ làm / ngày lễ / đã tạm dừng).
 
-**Cách 1 — Không cần Terminal (dễ nhất):**  
-Right-click vào file → chọn **Open** → hỏi lại → bấm **Open** lần nữa → xong ✅  
-Lần sau double-click bình thường được rồi.
+**Q: Thông báo có nút bấm không hiện trên máy tôi?**
+→ Một số bản Chrome trên macOS không hỗ trợ nút trên thông báo. Extension tự phát hiện và gửi lại bản không nút. Dùng bàn phím tắt để thay thế.
 
-**Cách 2 — Dùng Terminal (1 lần duy nhất):**
+**Q: Chrome Extension không load được?**
+→ Đảm bảo đã bật **Developer mode** trong `chrome://extensions/`.
+
+**Q: Đổi chu kỳ nhắc ở đâu?**
+→ ⚙️ Settings → ⏱️ Thời gian nhắc — đủ cả 9 loại.
+
+**Q: Lịch nghỉ lễ tới năm nào?**
+→ Ngày lễ âm lịch (Tết, Giỗ Tổ) hardcode tới **2027**. Sau đó cần cập nhật trong `chrome-extension/lib/core.js` (`VN_HOLIDAYS_LUNAR`). Ngày lễ dương lịch tự tính theo năm.
+
+**Q: Double-click `Start_macOS.command` bị chặn?**
+→ Right-click file → **Open** → xác nhận **Open**. Hoặc:
 ```bash
-# Cấp quyền thực thi + xóa flag quarantine
 chmod +x Start_macOS.command
 xattr -d com.apple.quarantine Start_macOS.command
-```
-Sau đó double-click bình thường, không bị hỏi nữa.
-
-**Q: App không gửi notification trên macOS?**  
-→ System Settings → Notifications → Terminal (hoặc Python) → Bật Allow Notifications
-
-**Q: Chạy app tự động khi bật máy (macOS)?**  
-→ System Settings → General → Login Items → Thêm `Start_macOS.command`
-
-**Q: Chrome Extension không load được?**  
-→ Đảm bảo đã bật **Developer mode** trong `chrome://extensions/`
-
-**Q: Muốn dùng trên cả Mac lẫn Windows?**  
-→ Dùng **Chrome Extension** — không cần cài Python, chạy được trên cả 2
-
----
-
-## 📁 Cấu trúc project
-
-```
-WORK-HEALTH-REMINDER-PRO/
-│
-├── 🖱️  Start_macOS.command    ← Double-click để chạy (macOS)
-├── 🖱️  Start_Windows.bat      ← Double-click để chạy (Windows)
-│
-├── menubar_app.py             ← macOS Menu Bar App (khuyên dùng)
-├── reminder_pro.py            ← Terminal PRO version
-├── reminder.py                ← Terminal cơ bản
-├── reminder_gui.py            ← GUI version
-├── exercises.py               ← Module bài tập
-├── water_tracker.py           ← Water Tracker module
-│
-├── chrome-extension/          ← Chrome Extension (macOS + Windows)
-│   ├── manifest.json
-│   ├── popup.html
-│   ├── popup.js
-│   ├── popup.css
-│   ├── background.js
-│   └── icons/
-│
-├── index.html                 ← Web version (mở bằng browser)
-├── app.js
-├── styles.css
-└── README.md
 ```
 
 ---
 
 ## 🙏 Credits
 
-Built with ❤️ for productivity and health.  
+Built with ❤️ for productivity and health.
 Dựa trên nghiên cứu của Columbia University, WHO, AAO, Cornell University.

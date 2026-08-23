@@ -56,26 +56,32 @@ class YouTubeController {
     }
 
     observeNavigation() {
-        // YouTube uses History API for navigation
+        // YouTube điều hướng bằng History API. Không quan sát cả document.body
+        // với subtree:true (bản cũ) — YouTube thay đổi DOM liên tục nên
+        // callback bị gọi hàng nghìn lần mỗi phút chỉ để so sánh URL.
         let lastUrl = location.href;
 
-        const observer = new MutationObserver(() => {
-            if (location.href !== lastUrl) {
-                lastUrl = location.href;
-                // Reset and wait for new video
-                this.video = null;
-                this.initialized = false;
-                this.isShorts = false;
-                if (this.updateInterval) {
-                    clearInterval(this.updateInterval);
-                }
-                // Restart ad skipper for new page
-                this.initAdSkipper();
-                setTimeout(() => this.waitForVideo(), 1000);
-            }
-        });
+        const onNavigate = () => {
+            if (location.href === lastUrl) return;
+            lastUrl = location.href;
+            this.video = null;
+            this.initialized = false;
+            this.isShorts = false;
+            if (this.updateInterval) clearInterval(this.updateInterval);
+            this.initAdSkipper();
+            setTimeout(() => this.waitForVideo(), 1000);
+        };
 
-        observer.observe(document.body, { childList: true, subtree: true });
+        // YouTube phát event riêng khi đổi trang; kèm popstate cho nút back
+        window.addEventListener('yt-navigate-finish', onNavigate);
+        window.addEventListener('popstate', onNavigate);
+
+        // Lưới an toàn: chỉ theo dõi title, đổi khi sang video khác
+        const titleEl = document.querySelector('title');
+        if (titleEl) {
+            this.navObserver = new MutationObserver(onNavigate);
+            this.navObserver.observe(titleEl, { childList: true });
+        }
     }
 
     setupVideoListeners() {
@@ -85,11 +91,8 @@ class YouTubeController {
             this.video.addEventListener(event, () => this.sendStateUpdate());
         });
 
-        // Block play when Focus mode is active
+        // Chặn play khi Focus mode đang bật
         this.video.addEventListener('play', () => this.checkAndBlockIfFocusMode());
-
-        // Start periodic focus mode check
-        this.startFocusModeCheck();
     }
 
     // Check focus mode status and pause if active
@@ -98,36 +101,14 @@ class YouTubeController {
             const response = await chrome.runtime.sendMessage({ action: 'getFocusStatus' });
             if (response && response.isFocusActive) {
                 this.focusModeActive = true;
-                // Pause the video immediately
                 if (this.video && !this.video.paused) {
                     this.video.pause();
-                    console.log('[Focus Mode] Video paused - Focus mode is active');
                 }
             } else {
                 this.focusModeActive = false;
             }
         } catch (e) {
-            // Extension context may be invalid, ignore
-        }
-    }
-
-    // Periodically check focus mode status
-    startFocusModeCheck() {
-        if (this.focusCheckInterval) {
-            clearInterval(this.focusCheckInterval);
-        }
-        // Check every 2 seconds
-        this.focusCheckInterval = setInterval(() => this.updateFocusModeStatus(), 2000);
-    }
-
-    async updateFocusModeStatus() {
-        try {
-            const response = await chrome.runtime.sendMessage({ action: 'getFocusStatus' });
-            if (response) {
-                this.focusModeActive = response.isFocusActive;
-            }
-        } catch (e) {
-            // Extension context may be invalid, ignore
+            // Extension context có thể đã invalid
         }
     }
 
@@ -254,34 +235,35 @@ class YouTubeController {
     // Ad Skipper
     // ========================================
     initAdSkipper() {
-        // Clear existing interval if any
         if (this.adSkipperInterval) {
             clearInterval(this.adSkipperInterval);
         }
-
-        // Check for skip button every 500ms
+        // 2 giây thay vì 500ms: quảng cáo YouTube không thể skip trong
+        // ~5 giây đầu, nên poll 500ms chỉ tốn CPU chứ không nhanh hơn.
         this.adSkipperInterval = setInterval(() => {
             this.trySkipAd();
-        }, 500);
+        }, 2000);
     }
 
     trySkipAd() {
-        // YouTube ad skip button selectors
+        // Chỉ dò trong player, không quét cả document. Bỏ selector
+        // [class*="skip-button"] vì nó quá rộng, dễ click nhầm nút khác.
+        const player = document.querySelector('#movie_player') ||
+                       document.querySelector('.html5-video-player');
+        if (!player) return;
+
         const skipSelectors = [
             '.ytp-ad-skip-button',
             '.ytp-ad-skip-button-modern',
             '.ytp-skip-ad-button',
             'button.ytp-ad-skip-button-text',
-            '.ytp-ad-skip-button-container button',
-            '[class*="skip-button"]'
+            '.ytp-ad-skip-button-container button'
         ];
 
         for (const selector of skipSelectors) {
-            const skipBtn = document.querySelector(selector);
-            // Check if button exists and is visible (offsetParent !== null)
+            const skipBtn = player.querySelector(selector);
             if (skipBtn && skipBtn.offsetParent !== null) {
                 skipBtn.click();
-                console.log('[Health Reminder] Ad skipped');
                 return;
             }
         }
@@ -387,9 +369,15 @@ class YouTubeController {
     }
 }
 
-// Initialize controller when script loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => new YouTubeController());
-} else {
-    new YouTubeController();
+// Khởi tạo controller — CÓ GUARD chống khởi tạo trùng.
+// Bug cũ: mỗi lần background gọi executeScript để re-inject là tạo thêm một
+// YouTubeController mới với đủ bộ interval + MutationObserver riêng, chồng
+// lên cái cũ và không ai dọn.
+if (!window.__whrYoutubeControllerInit) {
+    window.__whrYoutubeControllerInit = true;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => new YouTubeController());
+    } else {
+        new YouTubeController();
+    }
 }

@@ -2435,3 +2435,42 @@ select:focus {
     color: var(--text-secondary, #aaa);
     margin-left: 4px;
 }
+
+/* ========================================
+   v3.2 — Suppression banner + interval budget
+   ======================================== */
+
+/* Lý do đang KHÔNG nhắc. Bắt buộc phải hiển thị để suppression
+   (idle / họp / nghỉ trưa / ngoài giờ) không bao giờ "im lặng thất bại". */
+.suppress-banner {
+    margin: 8px 0 4px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(66, 165, 245, 0.12);
+    border-left: 3px solid #42a5f5;
+    color: #bbdefb;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.budget-hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #90a4ae;
+    line-height: 1.5;
+}
+
+.budget-hint.budget-warn {
+    color: #ffb74d;
+}
+
+/* 9 interval nên grid cần gọn hơn */
+.intervals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.interval-item label {
+    font-size: 11px;
+}

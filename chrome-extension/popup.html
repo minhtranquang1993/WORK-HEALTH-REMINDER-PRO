@@ -39,6 +39,9 @@
             </div>
         </section>
 
+        <!-- Lý do đang không nhắc (idle / họp / nghỉ trưa / ngoài giờ...) -->
+        <div class="suppress-banner hidden" id="suppressBanner"></div>
+
         <!-- Tabs Navigation -->
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="timers">⏱️ Timer</button>
@@ -472,20 +475,70 @@
                 <div class="intervals-grid">
                     <div class="interval-item">
                         <label>🚶 Đi bộ</label>
-                        <input type="number" id="intervalWalk" min="5" max="120" value="30">
+                        <input type="number" id="interval_walk" min="1" max="600" value="60">
                     </div>
                     <div class="interval-item">
                         <label>💧 Nước</label>
-                        <input type="number" id="intervalWater" min="5" max="120" value="45">
+                        <input type="number" id="interval_water" min="1" max="600" value="60">
                     </div>
                     <div class="interval-item">
                         <label>👁️ 20-20-20</label>
-                        <input type="number" id="intervalEye" min="5" max="60" value="20">
+                        <input type="number" id="interval_eye_20_20_20" min="1" max="600" value="20">
                     </div>
                     <div class="interval-item">
                         <label>🪑 Tư thế</label>
-                        <input type="number" id="intervalPosture" min="5" max="120" value="45">
+                        <input type="number" id="interval_posture" min="1" max="600" value="90">
                     </div>
+                    <div class="interval-item">
+                        <label>😊 Chớp mắt</label>
+                        <input type="number" id="interval_blink" min="1" max="600" value="90">
+                    </div>
+                    <div class="interval-item">
+                        <label>🧘 Giãn cổ vai</label>
+                        <input type="number" id="interval_neck_stretch" min="1" max="600" value="90">
+                    </div>
+                    <div class="interval-item">
+                        <label>🚻 Toilet</label>
+                        <input type="number" id="interval_toilet" min="1" max="600" value="120">
+                    </div>
+                    <div class="interval-item">
+                        <label>👀 Bài tập mắt</label>
+                        <input type="number" id="interval_eye_exercise" min="1" max="600" value="180">
+                    </div>
+                    <div class="interval-item">
+                        <label>🌬️ Hít thở sâu</label>
+                        <input type="number" id="interval_breathing" min="1" max="600" value="180">
+                    </div>
+                </div>
+                <div class="budget-hint" id="notificationBudget"></div>
+            </div>
+
+            <!-- Automation -->
+            <div class="settings-group">
+                <h3 class="section-title">🤖 Tự động</h3>
+                <div class="setting-row toggle-row">
+                    <label title="Không nhắc khi bạn rời máy hoặc máy đang khoá">
+                        💤 Tắt nhắc khi rời máy
+                    </label>
+                    <input type="checkbox" id="settingIdleSuppression" checked>
+                </div>
+                <div class="setting-row toggle-row">
+                    <label title="Tự phát hiện tab Meet/Zoom/Teams đang phát tiếng và tạm tắt nhắc">
+                        📞 Tự tắt nhắc khi đang họp
+                    </label>
+                    <input type="checkbox" id="settingMeetingFocus" checked>
+                </div>
+                <div class="setting-row toggle-row">
+                    <label title="Chỉ nhắc uống nước khi đang tụt so với tiến độ ngày">
+                        💧 Nhắc nước theo tiến độ
+                    </label>
+                    <input type="checkbox" id="settingWaterPace" checked>
+                </div>
+                <div class="setting-row toggle-row">
+                    <label title="Nhắc nào bị bỏ qua nhiều lần sẽ tự giãn ra (có giới hạn)">
+                        📉 Tự giãn nhắc bị bỏ qua
+                    </label>
+                    <input type="checkbox" id="settingAdaptive">
                 </div>
             </div>
 
@@ -538,7 +591,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <span>Work Health Reminder PRO v3.0</span>
+            <span>Work Health Reminder PRO v3.2</span>
             <button class="exercise-quick-btn" id="btnExerciseQuick" title="Bài tập nhanh">💪</button>
         </footer>
     </div>
@@ -562,6 +615,7 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <script src="lib/core.js"></script>
     <script src="exercises.js"></script>
     <script src="popup.js"></script>
 </body>

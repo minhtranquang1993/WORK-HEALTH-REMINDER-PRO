@@ -1,0 +1,15 @@
+{
+  "name": "work-health-reminder-pro",
+  "version": "3.2.0",
+  "private": true,
+  "description": "Chrome extension nhắc nhở sức khỏe khi làm việc — có test cho logic lõi và service worker.",
+  "scripts": {
+    "test": "node --test tests/core.test.js tests/background.test.js",
+    "test:core": "node --test tests/core.test.js",
+    "test:bg": "node --test tests/background.test.js",
+    "check": "node --check chrome-extension/background.js && node --check chrome-extension/popup.js && node --check chrome-extension/youtube-content.js && node --check chrome-extension/lib/core.js && node -e \"JSON.parse(require('fs').readFileSync('chrome-extension/manifest.json'))\" && echo OK"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

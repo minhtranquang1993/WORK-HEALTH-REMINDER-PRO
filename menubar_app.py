@@ -258,9 +258,30 @@ class YouTubeHTTPHandler(BaseHTTPRequestHandler):
         pass  # Suppress logging
 
     def send_cors_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        """
+        CHỈ cho phép origin chrome-extension://, KHÔNG dùng '*'.
+
+        Bug bảo mật cũ: Access-Control-Allow-Origin: '*' trên endpoint
+        loopback này nghĩa là BẤT KỲ website nào user đang mở cũng đọc
+        được /youtube/state — tức là biết user đang xem video gì.
+        Extension gửi kèm header X-WHR-Source nên ta phản chiếu lại đúng
+        origin của extension và không mở cho web thường.
+        """
+        origin = self.headers.get('Origin', '')
+        if origin.startswith('chrome-extension://'):
+            self.send_header('Access-Control-Allow-Origin', origin)
+        # Origin khác (hoặc không có) -> không gửi header CORS,
+        # browser sẽ tự chặn không cho trang web đọc response.
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-WHR-Source')
+        self.send_header('Vary', 'Origin')
+
+    def _is_from_extension(self) -> bool:
+        """Yêu cầu đến từ extension (có X-WHR-Source) hoặc từ chính máy."""
+        if self.headers.get('X-WHR-Source'):
+            return True
+        origin = self.headers.get('Origin', '')
+        return origin.startswith('chrome-extension://') or not origin
 
     def do_OPTIONS(self):
         """Handle CORS preflight"""
@@ -273,6 +294,12 @@ class YouTubeHTTPHandler(BaseHTTPRequestHandler):
         global youtube_state
 
         if self.path == '/youtube/state':
+            # Chặn website thường ghi state giả vào menubar app
+            if not self._is_from_extension():
+                self.send_response(403)
+                self.send_cors_headers()
+                self.end_headers()
+                return
             try:
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
@@ -310,6 +337,13 @@ class YouTubeHTTPHandler(BaseHTTPRequestHandler):
         global youtube_state
 
         if self.path == '/youtube/state':
+            # Chặn website thường đọc lịch sử xem video
+            if not self._is_from_extension():
+                self.send_response(403)
+                self.send_cors_headers()
+                self.end_headers()
+                return
+
             self.send_response(200)
             self.send_cors_headers()
             self.send_header('Content-Type', 'application/json')
